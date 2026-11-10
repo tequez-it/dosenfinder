@@ -2,43 +2,50 @@ import { useEffect, useState } from 'preact/hooks';
 import { Home } from './screens/Home';
 import { CacheList } from './screens/CacheList';
 import { ImportScreen } from './screens/ImportScreen';
-
-type Route = 'home' | 'list' | 'import';
-
-/** Einfaches Hash-Routing: #/liste, #/import – leer = Startseite. */
-function routeFromHash(): Route {
-  const h = location.hash.replace(/^#\/?/, '');
-  if (h === 'liste') return 'list';
-  if (h === 'import') return 'import';
-  return 'home';
-}
-
-const HASH: Record<Route, string> = { home: '', list: '#/liste', import: '#/import' };
+import { CacheDetail } from './screens/CacheDetail';
+import { Navigate } from './screens/Navigate';
+import { hashFor, parseHash, type Route } from './routes';
 
 export function App() {
-  const [route, setRoute] = useState<Route>(routeFromHash);
+  const [route, setRoute] = useState<Route>(() => parseHash(location.hash));
 
   useEffect(() => {
-    const onHash = () => setRoute(routeFromHash());
+    const onHash = () => {
+      setRoute(parseHash(location.hash));
+      window.scrollTo(0, 0);
+    };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
   const go = (r: Route) => {
-    if (r === 'home') {
-      history.pushState(null, '', location.pathname);
-      setRoute('home');
-    } else {
-      location.hash = HASH[r];
-    }
+    location.hash = hashFor(r);
   };
 
-  switch (route) {
+  switch (route.name) {
     case 'list':
-      return <CacheList onBack={() => go('home')} onImport={() => go('import')} />;
+      return <CacheList onBack={() => go({ name: 'home' })} onImport={() => go({ name: 'import' })} />;
     case 'import':
-      return <ImportScreen onBack={() => go('home')} onShowList={() => go('list')} />;
+      return <ImportScreen onBack={() => go({ name: 'home' })} onShowList={() => go({ name: 'list' })} />;
+    case 'cache':
+      return (
+        <CacheDetail
+          key={route.code}
+          code={route.code}
+          onBack={() => go({ name: 'list' })}
+          onNavigate={(waypoint) => go({ name: 'nav', code: route.code, waypoint })}
+        />
+      );
+    case 'nav':
+      return (
+        <Navigate
+          key={`${route.code}/${route.waypoint ?? ''}`}
+          code={route.code}
+          waypoint={route.waypoint}
+          onBack={() => go({ name: 'cache', code: route.code })}
+        />
+      );
     default:
-      return <Home onList={() => go('list')} onImport={() => go('import')} />;
+      return <Home onList={() => go({ name: 'list' })} onImport={() => go({ name: 'import' })} />;
   }
 }
