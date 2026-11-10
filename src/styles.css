@@ -36,7 +36,8 @@ button { font: inherit; color: inherit; }
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 56px;
+  /* Höhe der Leiste + Platz für die iOS-Statusleiste (Uhrzeit, Akku) */
+  min-height: calc(56px + env(safe-area-inset-top));
   padding: env(safe-area-inset-top) 8px 0;
   padding-left: max(8px, env(safe-area-inset-left));
   padding-right: max(8px, env(safe-area-inset-right));
@@ -162,3 +163,79 @@ select {
 .danger-zone { margin-top: 32px; border-top: 1px solid var(--line); padding-top: 8px; }
 .confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; }
 .confirm span { flex-basis: 100%; padding-top: 8px; }
+
+a.cache-row { color: inherit; text-decoration: none; }
+a.cache-row:active { background: #1a1a1a; }
+
+/* Cache-Details */
+.detail-top { display: flex; align-items: center; gap: 12px; padding: 16px 16px 8px; }
+.detail-name { font-size: 20px; font-weight: 600; line-height: 1.25; }
+.detail-name.archived { text-decoration: line-through; color: var(--muted); }
+
+.banner { margin: 8px 16px; padding: 10px 12px; border-radius: 10px; font-size: 14px; }
+.banner-warn { background: #3a1d00; color: #ffb35c; }
+
+.info {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 8px 16px;
+  font-size: 15px;
+}
+.info dt { color: var(--muted); text-align: right; }
+.info dd { margin: 0; overflow-wrap: anywhere; }
+
+.section { border-top: 1px solid var(--line); padding: 4px 16px 12px; }
+.section h2 { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin: 12px 0 8px; }
+
+.attributes { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.attributes li { background: #222; border: 1px solid #333; border-radius: 14px; padding: 4px 10px; font-size: 13px; }
+.attributes li.attr-no { color: var(--muted); text-decoration: line-through; }
+
+.hint {
+  display: flex; flex-direction: column; gap: 6px; width: 100%;
+  text-align: left; padding: 12px;
+  background: var(--surface); border: 1px solid #333; border-radius: 10px;
+}
+.hint-toggle { font-size: 13px; color: var(--accent); }
+
+/* Beschreibung auf hellem Grund, weil viele Owner schwarze Schrift voraussetzen */
+.description {
+  background: #fff; color: #111;
+  border-radius: 10px; padding: 12px;
+  overflow-wrap: anywhere; line-height: 1.45;
+}
+.description img { max-width: 100%; height: auto; }
+.description table { max-width: 100%; display: block; overflow-x: auto; }
+.description a { color: #0b57d0; }
+.plain { white-space: pre-wrap; margin: 0 0 8px; }
+
+.waypoints, .logs { list-style: none; margin: 0; padding: 0; }
+.waypoints li { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.waypoints li:last-child, .logs li:last-child { border-bottom: 0; }
+.wp-main { flex: 1; min-width: 0; }
+.wp-name { font-weight: 600; }
+.wp-meta { font-size: 13px; color: var(--muted); }
+.wp-comment { font-size: 14px; margin-top: 4px; white-space: pre-wrap; }
+
+.log { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.log-head { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.log-type { font-weight: 600; font-size: 14px; }
+.log-found { color: var(--ok); }
+.log-dnf { color: var(--danger); }
+.log-meta { font-size: 13px; color: var(--muted); }
+.log-text { font-size: 14px; margin-top: 4px; }
+
+/* Navigation */
+.nav-screen { text-align: center; }
+.nav-screen .header { text-align: left; }
+.nav-coords { margin-top: 12px; color: var(--muted); font-size: 15px; font-variant-numeric: tabular-nums; }
+.nav-distance { font-size: 56px; font-weight: 700; line-height: 1.1; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.nav-bearing { color: var(--muted); font-size: 16px; }
+.nav-arrow-wrap { position: relative; width: min(70vw, 300px); aspect-ratio: 1; margin: 16px auto; }
+.nav-arrow { width: 100%; height: 100%; transition: transform 0.25s linear; }
+.nav-arrow-off { opacity: 0.25; }
+.nav-north { position: absolute; top: -6px; left: 50%; transform: translateX(-50%); color: var(--danger); font-weight: 700; }
+.nav-hint { color: var(--muted); font-size: 14px; margin: 8px 16px; }
+.nav-info { text-align: left; max-width: 360px; margin: 16px auto; padding: 0 16px; }
+.nav-note { color: #666; font-size: 13px; margin: 16px; }

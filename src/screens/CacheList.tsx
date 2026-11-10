@@ -7,6 +7,7 @@ import { Header } from '../components/Header';
 import { TypeIcon } from '../components/TypeIcon';
 import { FilterPanel } from '../components/FilterPanel';
 import type { CacheSummary, CacheType } from '../types';
+import { hashFor } from '../routes';
 
 interface Props {
   onBack: () => void;
@@ -95,7 +96,8 @@ export function CacheList({ onBack, onImport }: Props) {
 
       <ul class="cache-list">
         {rows.map(({ cache: c, dist, dir }) => (
-          <li class="cache-row" key={c.code}>
+          <li key={c.code}>
+            <a class="cache-row" href={hashFor({ name: 'cache', code: c.code })}>
             <TypeIcon type={c.type} found={c.found} dimmed={!c.available || c.archived} />
             <div class="cache-main">
               <div class={`cache-name ${c.archived ? 'archived' : ''} ${!c.available ? 'disabled' : ''}`}>{c.name}</div>
@@ -115,6 +117,7 @@ export function CacheList({ onBack, onImport }: Props) {
                 <div class="cache-dir">–</div>
               )}
             </div>
+            </a>
           </li>
         ))}
       </ul>

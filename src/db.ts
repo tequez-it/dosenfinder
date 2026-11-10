@@ -84,6 +84,10 @@ export async function getAllSummaries(): Promise<CacheSummary[]> {
   return (await db()).getAll('caches');
 }
 
+export async function getSummary(code: string): Promise<CacheSummary | undefined> {
+  return (await db()).get('caches', code);
+}
+
 export async function getDetails(code: string): Promise<CacheDetails | undefined> {
   return (await db()).get('details', code);
 }
