@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#f39200"/>
+  <!-- Dose -->
+  <path d="M146 176v196c0 33 49 60 110 60s110-27 110-60V176" fill="#fff"/>
+  <ellipse cx="256" cy="176" rx="110" ry="46" fill="#fff"/>
+  <ellipse cx="256" cy="176" rx="110" ry="46" fill="none" stroke="#1c1c1c" stroke-width="14"/>
+  <path d="M146 176v196c0 33 49 60 110 60s110-27 110-60V176" fill="none" stroke="#1c1c1c" stroke-width="14"/>
+  <!-- Standort-Pin auf der Dose -->
+  <path d="M256 250c-30 0-52 22-52 50 0 38 52 86 52 86s52-48 52-86c0-28-22-50-52-50z" fill="#1c1c1c"/>
+  <circle cx="256" cy="300" r="18" fill="#f39200"/>
+</svg>

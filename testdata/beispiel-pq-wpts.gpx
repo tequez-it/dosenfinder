@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Selbst erstellte Testdaten: Zusatz-Wegpunkte wie in der "-wpts.gpx" einer Pocket Query. Alles erfunden. -->
+<gpx xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.0" creator="Dosenfinder Testdaten" xmlns="http://www.topografix.com/GPX/1/0">
+  <wpt lat="50.99010" lon="10.02900">
+    <time>2020-06-01T00:00:00</time>
+    <name>PKTEST2</name>
+    <cmt>Kostenlos parken</cmt>
+    <desc>Parkplatz</desc>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+  </wpt>
+  <wpt lat="50.99200" lon="10.03300">
+    <time>2020-06-01T00:00:00</time>
+    <name>S1TEST2</name>
+    <cmt>Zähle die Bänke = A</cmt>
+    <desc>Station 1</desc>
+    <sym>Physical Stage</sym>
+    <type>Waypoint|Physical Stage</type>
+  </wpt>
+  <wpt lat="0" lon="0">
+    <time>2020-06-01T00:00:00</time>
+    <name>FNTEST2</name>
+    <cmt>N 50° 59.AAA E 010° 02.BBB</cmt>
+    <desc>Final</desc>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+  </wpt>
+  <wpt lat="50.90000" lon="10.10000">
+    <name>PKNICHT9</name>
+    <desc>Parkplatz eines Caches, der nicht in der Datei ist</desc>
+    <type>Waypoint|Parking Area</type>
+  </wpt>
+</gpx>

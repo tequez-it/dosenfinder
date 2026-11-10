@@ -1,0 +1,15 @@
+node_modules/
+dist/
+dev-dist/
+*.log
+.DS_Store
+
+# Öffentliches Repo: echte Cache-Daten (GPX / Pocket Queries) gehören NIE hierher.
+# Erlaubt sind nur selbst erstellte Testdaten in testdata/.
+*.gpx
+*.zip
+!testdata/*.gpx
+
+# Secrets / lokale Konfiguration
+.env
+.env.*
