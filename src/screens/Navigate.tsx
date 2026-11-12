@@ -56,6 +56,11 @@ export function Navigate({ code, waypoint, onBack }: Props) {
   const dist = pos ? distance(pos, target) : null;
   const brg = pos ? bearing(pos, target) : null;
   const hasCompass = heading.status === 'ok';
+  const gpsAccuracy = position.status === 'ok' ? position.accuracy : null;
+  // Liegt das Ziel innerhalb der GPS-Ungenauigkeit, ist die Richtung nicht mehr verlässlich
+  const nearTarget = dist !== null && gpsAccuracy !== null && dist <= Math.max(gpsAccuracy, 5);
+  const compassUncalibrated =
+    heading.status === 'ok' && heading.accuracy !== null && (heading.accuracy < 0 || heading.accuracy > 25);
 
   // Mit Kompass: Pfeil relativ zur Blickrichtung. Ohne: relativ zu Norden.
   if (brg !== null) {
@@ -77,7 +82,7 @@ export function Navigate({ code, waypoint, onBack }: Props) {
       <div class={`nav-arrow-wrap ${brg === null ? 'nav-arrow-off' : ''}`}>
         {!hasCompass && <div class="nav-north">N</div>}
         <svg
-          class="nav-arrow"
+          class={`nav-arrow ${hasCompass ? '' : 'nav-arrow-smooth'}`}
           viewBox="0 0 200 200"
           style={{ transform: `rotate(${rotation.current}deg)` }}
           aria-label={brg !== null ? `Richtung ${Math.round(brg)} Grad` : 'Richtung unbekannt'}
@@ -86,11 +91,18 @@ export function Navigate({ code, waypoint, onBack }: Props) {
         </svg>
       </div>
 
+      {nearTarget && (
+        <p class="nav-near">Du bist am Ziel – im Umkreis der GPS-Genauigkeit. Der Pfeil kann jetzt springen, schau dich um.</p>
+      )}
+      {compassUncalibrated && (
+        <p class="nav-hint">Kompass ungenau: Handy ein paar Mal in einer Acht bewegen und von Metall/Magneten fernhalten.</p>
+      )}
+
       <CompassStatus state={heading.status} onEnable={requestPermission} />
 
       <dl class="info nav-info">
         <dt>Genauigkeit</dt>
-        <dd>{position.status === 'ok' ? `± ${Math.round(position.accuracy)} m` : '–'}</dd>
+        <dd>{gpsAccuracy !== null ? `± ${Math.round(gpsAccuracy)} m` : '–'}</dd>
         <dt>Mein Standort</dt>
         <dd>{pos ? formatCoords(pos.lat, pos.lon) : '–'}</dd>
         {hasCompass && (

@@ -3,9 +3,9 @@
 Web-App (PWA) fürs iPhone, um Geocaches aus GPX-Dateien und Pocket Queries offline zu finden.
 Bedienung und Look angelehnt an c:geo. Alle Daten bleiben auf dem Gerät – es gibt keinen Server und keinen Login.
 
-**Stand 0.2.0:** Import (GPX / Pocket-Query-ZIP inkl. Wegpunkte), Cache-Liste nach Entfernung, Filter (Typ, D/T, gefunden),
-Cache-Details (Infos, Attribute, Hinweis, Beschreibung, Wegpunkte, Logs), Navigation mit Kompass zu Cache oder Wegpunkt.
-Noch nicht: Karte.
+**Stand 0.3.0:** Import (GPX / Pocket-Query-ZIP inkl. Wegpunkte), Cache-Liste nach Entfernung, Filter (Typ, D/T, gefunden),
+Cache-Details (Infos, Attribute, Hinweis, Beschreibung, Wegpunkte, Logs), Navigation mit Kompass zu Cache oder Wegpunkt,
+Karte mit Cache-Symbolen (OpenStreetMap, nur online).
 
 ## Nutzung auf dem iPhone
 
@@ -22,12 +22,13 @@ npm test         # Unit-Tests
 npm run build    # Produktions-Build nach dist/
 ```
 
-Technik: Vite, Preact, TypeScript, IndexedDB (`idb`), ZIP-Entpacken mit `fflate`, PWA über `vite-plugin-pwa`.
+Technik: Vite, Preact, TypeScript, IndexedDB (`idb`), ZIP-Entpacken mit `fflate`, Karte mit `maplibre-gl` und OpenStreetMap-Kacheln, PWA über `vite-plugin-pwa`.
 
 ```
 src/
   gpx/        GPX-Parser und Datei-Import (GPX + ZIP)
-  screens/    Startseite, Liste, Import, Details, Navigation
+  screens/    Startseite, Liste, Karte, Import, Details, Navigation
+  map/        Karten-Symbole und Kartenstil
   components/ Kopfleiste, Typ-Symbole, Filter
   db.ts       lokale Datenbank (IndexedDB)
   geo.ts      Entfernung, Richtung, Formatierung

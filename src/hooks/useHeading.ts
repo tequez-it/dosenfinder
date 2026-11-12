@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { smoothAngle } from '../compass';
+import { useCallback, useEffect, useState } from 'preact/hooks';
+import { angleDelta, smoothAngle } from '../compass';
 
 export type HeadingState =
   | { status: 'pending' }
@@ -7,10 +7,19 @@ export type HeadingState =
   | { status: 'needs-permission' }
   | { status: 'denied' }
   | { status: 'unsupported' }
-  | { status: 'ok'; heading: number };
+  /** accuracy: Abweichung in Grad laut iOS, null = unbekannt, -1 = nicht kalibriert */
+  | { status: 'ok'; heading: number; accuracy: number | null };
 
-type IOSOrientationEvent = DeviceOrientationEvent & { webkitCompassHeading?: number };
+type IOSOrientationEvent = DeviceOrientationEvent & {
+  webkitCompassHeading?: number;
+  webkitCompassAccuracy?: number;
+};
 type PermissionFn = () => Promise<'granted' | 'denied'>;
+
+/** Glättung pro Messwert: klein genug gegen Zittern, groß genug, um nicht hinterherzuhinken */
+const SMOOTHING = 0.4;
+/** Änderungen darunter lösen kein neues Zeichnen aus */
+const MIN_CHANGE_DEG = 0.5;
 
 function screenAngle(): number {
   return (screen.orientation?.angle ?? 0) % 360;
@@ -19,6 +28,7 @@ function screenAngle(): number {
 /**
  * Blickrichtung des Geräts in Grad (0 = Norden).
  * iOS liefert sie als webkitCompassHeading, Android über deviceorientationabsolute.
+ * Messwerte kommen sehr oft (bis 60×/s); gezeichnet wird höchstens einmal pro Bildschirm-Frame.
  */
 export function useHeading(): { state: HeadingState; requestPermission: () => void } {
   const needsPermission =
@@ -27,7 +37,6 @@ export function useHeading(): { state: HeadingState; requestPermission: () => vo
 
   const [state, setState] = useState<HeadingState>(needsPermission ? { status: 'needs-permission' } : { status: 'pending' });
   const [listening, setListening] = useState(!needsPermission);
-  const smoothed = useRef<number | null>(null);
 
   useEffect(() => {
     if (!listening) return;
@@ -36,15 +45,31 @@ export function useHeading(): { state: HeadingState; requestPermission: () => vo
       return;
     }
 
+    let smoothed: number | null = null;
+    let shown: number | null = null;
+    let accuracy: number | null = null;
+    let frame = 0;
+
+    const commit = () => {
+      frame = 0;
+      if (smoothed === null) return;
+      if (shown !== null && Math.abs(angleDelta(shown, smoothed)) < MIN_CHANGE_DEG) return;
+      shown = smoothed;
+      setState({ status: 'ok', heading: smoothed, accuracy });
+    };
+
     const update = (raw: number) => {
       const h = (raw + screenAngle() + 360) % 360;
-      smoothed.current = smoothed.current === null ? h : smoothAngle(smoothed.current, h, 0.25);
-      setState({ status: 'ok', heading: smoothed.current });
+      smoothed = smoothed === null ? h : smoothAngle(smoothed, h, SMOOTHING);
+      if (!frame) frame = requestAnimationFrame(commit);
     };
 
     const onIOS = (e: Event) => {
-      const h = (e as IOSOrientationEvent).webkitCompassHeading;
-      if (typeof h === 'number' && h >= 0) update(h);
+      const ev = e as IOSOrientationEvent;
+      if (typeof ev.webkitCompassHeading === 'number' && ev.webkitCompassHeading >= 0) {
+        accuracy = typeof ev.webkitCompassAccuracy === 'number' ? ev.webkitCompassAccuracy : null;
+        update(ev.webkitCompassHeading);
+      }
     };
     const onAbsolute = (e: Event) => {
       const a = (e as DeviceOrientationEvent).alpha;
@@ -56,11 +81,12 @@ export function useHeading(): { state: HeadingState; requestPermission: () => vo
 
     // Kommt nach 3 s nichts, hat das Gerät keinen nutzbaren Kompass
     const timer = window.setTimeout(() => {
-      if (smoothed.current === null) setState({ status: 'unsupported' });
+      if (smoothed === null) setState({ status: 'unsupported' });
     }, 3000);
 
     return () => {
       window.clearTimeout(timer);
+      if (frame) cancelAnimationFrame(frame);
       window.removeEventListener('deviceorientation', onIOS);
       window.removeEventListener('deviceorientationabsolute', onAbsolute);
     };

@@ -14,6 +14,9 @@ interface Props {
   onImport: () => void;
 }
 
+/** Scrollposition merken, damit "Details → Zurück" an derselben Stelle der Liste landet */
+let savedScroll = 0;
+
 export function CacheList({ onBack, onImport }: Props) {
   const [caches, setCaches] = useState<CacheSummary[] | null>(null);
   const [filters, setFilters] = useState<Filters>(loadFilters);
@@ -23,6 +26,13 @@ export function CacheList({ onBack, onImport }: Props) {
   useEffect(() => {
     getAllSummaries().then(setCaches).catch(() => setCaches([]));
   }, []);
+
+  useEffect(() => {
+    if (caches && savedScroll > 0) {
+      const y = savedScroll;
+      requestAnimationFrame(() => window.scrollTo(0, y));
+    }
+  }, [caches]);
 
   const updateFilters = (f: Filters) => {
     setFilters(f);
@@ -60,7 +70,10 @@ export function CacheList({ onBack, onImport }: Props) {
       <Header
         title="Caches"
         subtitle={subtitle}
-        onBack={onBack}
+        onBack={() => {
+          savedScroll = 0;
+          onBack();
+        }}
         actions={
           total > 0 && (
             <button
@@ -97,7 +110,7 @@ export function CacheList({ onBack, onImport }: Props) {
       <ul class="cache-list">
         {rows.map(({ cache: c, dist, dir }) => (
           <li key={c.code}>
-            <a class="cache-row" href={hashFor({ name: 'cache', code: c.code })}>
+            <a class="cache-row" href={hashFor({ name: 'cache', code: c.code })} onClick={() => (savedScroll = window.scrollY)}>
             <TypeIcon type={c.type} found={c.found} dimmed={!c.available || c.archived} />
             <div class="cache-main">
               <div class={`cache-name ${c.archived ? 'archived' : ''} ${!c.available ? 'disabled' : ''}`}>{c.name}</div>

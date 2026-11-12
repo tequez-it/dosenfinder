@@ -1,6 +1,6 @@
 import type { CacheType } from '../types';
 
-const STYLE: Record<CacheType, { color: string; label: string }> = {
+export const TYPE_STYLE: Record<CacheType, { color: string; label: string }> = {
   traditional: { color: '#1f8a4c', label: 'Tr' },
   multi: { color: '#e07b00', label: 'Mu' },
   mystery: { color: '#1d5fb4', label: '?' },
@@ -22,7 +22,7 @@ interface Props {
 
 /** Eigenes, schlichtes Typ-Symbol: Farbe nach üblicher Cache-Farbe plus Kürzel. */
 export function TypeIcon({ type, found = false, dimmed = false, size = 34 }: Props) {
-  const s = STYLE[type];
+  const s = TYPE_STYLE[type];
   return (
     <svg width={size} height={size} viewBox="0 0 34 34" class="type-icon" style={{ opacity: dimmed ? 0.45 : 1 }} aria-hidden="true">
       <rect x="1" y="1" width="28" height="28" rx="7" fill={s.color} />

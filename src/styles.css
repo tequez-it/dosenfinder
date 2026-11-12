@@ -233,9 +233,49 @@ a.cache-row:active { background: #1a1a1a; }
 .nav-distance { font-size: 56px; font-weight: 700; line-height: 1.1; margin-top: 8px; font-variant-numeric: tabular-nums; }
 .nav-bearing { color: var(--muted); font-size: 16px; }
 .nav-arrow-wrap { position: relative; width: min(70vw, 300px); aspect-ratio: 1; margin: 16px auto; }
-.nav-arrow { width: 100%; height: 100%; transition: transform 0.25s linear; }
+.nav-arrow { width: 100%; height: 100%; will-change: transform; }
+/* Nur ohne Kompass weich animieren (GPS kommt ca. 1×/s). Mit Kompass wird jeder Frame direkt gezeichnet. */
+.nav-arrow-smooth { transition: transform 0.4s ease-out; }
+.nav-near { margin: 8px 16px; padding: 10px 12px; border-radius: 10px; background: #12301c; color: #7ee2a0; font-size: 15px; }
 .nav-arrow-off { opacity: 0.25; }
 .nav-north { position: absolute; top: -6px; left: 50%; transform: translateX(-50%); color: var(--danger); font-weight: 700; }
 .nav-hint { color: var(--muted); font-size: 14px; margin: 8px 16px; }
 .nav-info { text-align: left; max-width: 360px; margin: 16px auto; padding: 0 16px; }
 .nav-note { color: #666; font-size: 13px; margin: 16px; }
+
+/* Karte */
+.map-screen { display: flex; flex-direction: column; height: 100vh; height: 100dvh; padding-bottom: 0; }
+.map-wrap { position: relative; flex: 1; min-height: 0; }
+.map { width: 100%; height: 100%; background: #ddd; }
+.map-overlay-top { position: absolute; top: 0; left: 0; right: 0; z-index: 5; max-height: 70%; overflow-y: auto; }
+.map-banner {
+  position: absolute; top: 8px; left: 8px; right: 8px; z-index: 4;
+  padding: 8px 12px; border-radius: 10px;
+  background: rgba(20,20,20,0.92); color: var(--text); font-size: 14px;
+}
+.map-banner .text-btn { padding: 0; }
+.map-locate {
+  position: absolute; right: 12px; z-index: 4;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  width: 48px; height: 48px; border-radius: 24px;
+  display: grid; place-items: center;
+  background: var(--bar); color: var(--text); border: 1px solid #333;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+.map-locate:disabled { opacity: 0.5; }
+.map-sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 6;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: var(--bar); border-top: 2px solid var(--accent);
+  border-radius: 14px 14px 0 0;
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.5);
+}
+.map-sheet-head { display: flex; align-items: center; gap: 12px; }
+.map-sheet-actions { display: flex; gap: 10px; margin-top: 12px; }
+.map-sheet-actions button { flex: 1; }
+.secondary-btn {
+  display: block; width: 100%; padding: 14px;
+  background: #2a2a2a; color: var(--text);
+  border: 1px solid #3a3a3a; border-radius: 12px; font-weight: 600;
+}
+.maplibregl-ctrl-attrib { font-size: 11px; }
