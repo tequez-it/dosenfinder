@@ -3,11 +3,12 @@ import { getAllSummaries } from '../db';
 
 interface Props {
   onList: () => void;
+  onMap: () => void;
   onImport: () => void;
 }
 
 /** Startseite mit Kacheln, angelehnt an das c:geo-Hauptmenü. */
-export function Home({ onList, onImport }: Props) {
+export function Home({ onList, onMap, onImport }: Props) {
   const [count, setCount] = useState<number | null>(null);
 
   useEffect(() => {
@@ -28,6 +29,15 @@ export function Home({ onList, onImport }: Props) {
           </svg>
           <span class="tile-label">Caches</span>
           <span class="tile-sub">{count === null ? '' : `${count} gespeichert`}</span>
+        </button>
+        <button class="tile" onClick={onMap}>
+          <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true">
+            <rect x="4" y="4" width="48" height="48" rx="10" fill="#1d5fb4" />
+            <path d="M14 18l9-4 10 4 9-4v24l-9 4-10-4-9 4z" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round" />
+            <path d="M23 14v24M33 18v24" stroke="#fff" stroke-width="3" />
+          </svg>
+          <span class="tile-label">Karte</span>
+          <span class="tile-sub">Caches in der Umgebung</span>
         </button>
         <button class="tile" onClick={onImport}>
           <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true">

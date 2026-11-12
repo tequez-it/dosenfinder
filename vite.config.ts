@@ -36,7 +36,9 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png}'],
+        globPatterns: ['**/*.{js,mjs,css,html,svg,png}'],
+        // Die Karten-Bibliothek ist groß, soll aber offline verfügbar sein
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         navigateFallback: `${base}index.html`,
       },
     }),
