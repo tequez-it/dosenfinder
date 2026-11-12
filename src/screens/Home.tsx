@@ -1,18 +1,21 @@
 import { useEffect, useState } from 'preact/hooks';
-import { getAllSummaries } from '../db';
+import { getAllFieldNotes, getAllSummaries } from '../db';
 
 interface Props {
   onList: () => void;
   onMap: () => void;
+  onFieldNotes: () => void;
   onImport: () => void;
 }
 
 /** Startseite mit Kacheln, angelehnt an das c:geo-Hauptmenü. */
-export function Home({ onList, onMap, onImport }: Props) {
+export function Home({ onList, onMap, onFieldNotes, onImport }: Props) {
   const [count, setCount] = useState<number | null>(null);
+  const [notes, setNotes] = useState<number | null>(null);
 
   useEffect(() => {
     getAllSummaries().then((c) => setCount(c.length)).catch(() => setCount(0));
+    getAllFieldNotes().then((n) => setNotes(n.filter((x) => !x.exported).length)).catch(() => setNotes(0));
   }, []);
 
   return (
@@ -38,6 +41,15 @@ export function Home({ onList, onMap, onImport }: Props) {
           </svg>
           <span class="tile-label">Karte</span>
           <span class="tile-sub">Caches in der Umgebung</span>
+        </button>
+        <button class="tile" onClick={onFieldNotes}>
+          <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true">
+            <rect x="4" y="4" width="48" height="48" rx="10" fill="#6a5acd" />
+            <path d="M17 14h16l7 7v21H17z" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round" />
+            <path d="M22 28l4 4 8-8" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span class="tile-label">Field Notes</span>
+          <span class="tile-sub">{notes === null ? '' : notes === 0 ? 'keine neuen' : `${notes} neu`}</span>
         </button>
         <button class="tile" onClick={onImport}>
           <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true">
