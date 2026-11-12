@@ -9,7 +9,7 @@ import { distance, formatDistance, formatRating } from '../geo';
 import { isDefault, loadFilters, matches, saveFilters, type Filters } from '../filters';
 import { usePosition } from '../hooks/usePosition';
 import { Header } from '../components/Header';
-import { TypeIcon } from '../components/TypeIcon';
+import { TypeIcon, TYPE_STYLE } from '../components/TypeIcon';
 import { FilterPanel } from '../components/FilterPanel';
 import { createIcon, iconName, ICON_SIZE } from '../map/icons';
 import { getLastView, OSM_STYLE, setLastView } from '../map/mapView';
@@ -24,6 +24,9 @@ interface Props {
   onImport: () => void;
 }
 
+/** Ab dieser Zoomstufe Symbole statt Punkte */
+const SYMBOL_MIN_ZOOM = 12.5;
+
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
 
 function cachesToGeoJSON(caches: CacheSummary[]): FeatureCollection {
@@ -35,6 +38,8 @@ function cachesToGeoJSON(caches: CacheSummary[]): FeatureCollection {
       properties: {
         code: c.code,
         icon: iconName(c.type, c.found),
+        color: TYPE_STYLE[c.type].color,
+        found: c.found,
         dimmed: !c.available || c.archived,
         // Gefundene unten, offene oben zeichnen
         sort: c.found ? 0 : 1,
@@ -100,10 +105,26 @@ export function MapScreen({ onBack, onDetails, onNavigate, onImport }: Props) {
       }
 
       map.addSource('caches', { type: 'geojson', data: EMPTY });
+      // Weit herausgezoomt: kleine farbige Punkte, sonst überdecken sich hunderte Symbole
+      map.addLayer({
+        id: 'caches-dots',
+        type: 'circle',
+        source: 'caches',
+        maxzoom: SYMBOL_MIN_ZOOM,
+        layout: { 'circle-sort-key': ['get', 'sort'] },
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 3, SYMBOL_MIN_ZOOM, 6],
+          'circle-color': ['get', 'color'],
+          'circle-stroke-color': ['case', ['get', 'found'], '#ffffff', '#000000'],
+          'circle-stroke-width': 1,
+          'circle-opacity': ['case', ['get', 'dimmed'], 0.5, 1],
+        },
+      });
       map.addLayer({
         id: 'caches',
         type: 'symbol',
         source: 'caches',
+        minzoom: SYMBOL_MIN_ZOOM,
         layout: {
           'icon-image': ['get', 'icon'],
           'icon-allow-overlap': true,
@@ -145,7 +166,7 @@ export function MapScreen({ onBack, onDetails, onNavigate, onImport }: Props) {
           [e.point.x - 12, e.point.y - 12],
           [e.point.x + 12, e.point.y + 12],
         ];
-        const hit = map.queryRenderedFeatures(box, { layers: ['caches'] })[0];
+        const hit = map.queryRenderedFeatures(box, { layers: ['caches', 'caches-dots'] })[0];
         setSelected(hit ? (hit.properties.code as string) : null);
       });
 

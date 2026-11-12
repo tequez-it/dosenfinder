@@ -5,6 +5,8 @@ import { CacheList } from './screens/CacheList';
 import { ImportScreen } from './screens/ImportScreen';
 import { CacheDetail } from './screens/CacheDetail';
 import { Navigate } from './screens/Navigate';
+import { LogScreen } from './screens/LogScreen';
+import { FieldNotesScreen } from './screens/FieldNotesScreen';
 import { Header } from './components/Header';
 import { hashFor, parseHash, type Route } from './routes';
 
@@ -90,6 +92,10 @@ export function App() {
           onImport={() => go({ name: 'import' })}
         />
       );
+    case 'fieldnotes':
+      return <FieldNotesScreen onBack={() => back({ name: 'home' })} />;
+    case 'log':
+      return <LogScreen key={route.code} code={route.code} onDone={() => back({ name: 'cache', code: route.code })} />;
     case 'import':
       return <ImportScreen onBack={() => back({ name: 'home' })} onShowList={() => go({ name: 'list' })} />;
     case 'cache':
@@ -99,6 +105,7 @@ export function App() {
           code={route.code}
           onBack={() => back({ name: 'list' })}
           onNavigate={(waypoint) => go({ name: 'nav', code: route.code, waypoint })}
+          onLog={() => go({ name: 'log', code: route.code })}
         />
       );
     case 'nav':
@@ -111,6 +118,13 @@ export function App() {
         />
       );
     default:
-      return <Home onList={() => go({ name: 'list' })} onMap={() => go({ name: 'map' })} onImport={() => go({ name: 'import' })} />;
+      return (
+        <Home
+          onList={() => go({ name: 'list' })}
+          onMap={() => go({ name: 'map' })}
+          onFieldNotes={() => go({ name: 'fieldnotes' })}
+          onImport={() => go({ name: 'import' })}
+        />
+      );
   }
 }

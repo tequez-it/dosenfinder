@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { getDetails, getSummary } from '../db';
+import { getDetails, getFieldNote, getSummary } from '../db';
+import { FIELD_NOTE_TYPES, type FieldNote } from '../fieldnotes';
 import { distance, formatDistance, formatRating } from '../geo';
 import { formatCoords, formatDate, rot13 } from '../format';
 import { sanitizeHtml } from '../sanitize';
@@ -13,17 +14,18 @@ interface Props {
   onBack: () => void;
   /** ohne Argument = zum Cache, sonst zum Wegpunkt mit diesem Code */
   onNavigate: (waypoint?: string) => void;
+  onLog: () => void;
 }
 
-type Loaded = { summary: CacheSummary; details: CacheDetails | undefined } | null | 'missing';
+type Loaded = { summary: CacheSummary; details: CacheDetails | undefined; note: FieldNote | undefined } | null | 'missing';
 
-export function CacheDetail({ code, onBack, onNavigate }: Props) {
+export function CacheDetail({ code, onBack, onNavigate, onLog }: Props) {
   const [data, setData] = useState<Loaded>(null);
   const position = usePosition();
 
   useEffect(() => {
-    Promise.all([getSummary(code), getDetails(code)])
-      .then(([summary, details]) => setData(summary ? { summary, details } : 'missing'))
+    Promise.all([getSummary(code), getDetails(code), getFieldNote(code)])
+      .then(([summary, details, note]) => setData(summary ? { summary, details, note } : 'missing'))
       .catch(() => setData('missing'));
   }, [code]);
 
@@ -37,7 +39,7 @@ export function CacheDetail({ code, onBack, onNavigate }: Props) {
     );
   }
 
-  const { summary: c, details: d } = data;
+  const { summary: c, details: d, note } = data;
   const pos = position.status === 'ok' ? position.pos : null;
 
   return (
@@ -76,9 +78,23 @@ export function CacheDetail({ code, onBack, onNavigate }: Props) {
         {c.found && <Row label="Status" value="Gefunden ✓" />}
       </dl>
 
-      <div class="content">
+      <div class="content detail-actions">
         <button class="primary-btn" onClick={() => onNavigate()}>Navigieren</button>
+        <button class="secondary-btn" onClick={onLog}>{note ? 'Field Note ändern' : 'Loggen'}</button>
       </div>
+
+      {note && (
+        <section class="section">
+          <h2>Meine Field Note{note.exported ? ' (exportiert)' : ''}</h2>
+          <div class="log">
+            <div class="log-head">
+              <span class={`log-type ${FIELD_NOTE_TYPES[note.type].cls}`}>{FIELD_NOTE_TYPES[note.type].label}</span>
+              <span class="log-meta">{formatDate(note.date)}</span>
+            </div>
+            {note.text && <p class="plain log-text">{note.text}</p>}
+          </div>
+        </section>
+      )}
 
       {d && <DetailSections d={d} onNavigate={onNavigate} />}
       {!d && <div class="empty">Keine Beschreibung gespeichert.</div>}

@@ -279,3 +279,20 @@ a.cache-row:active { background: #1a1a1a; }
   border: 1px solid #3a3a3a; border-radius: 12px; font-weight: 600;
 }
 .maplibregl-ctrl-attrib { font-size: 11px; }
+
+/* Field Notes */
+.detail-actions { display: flex; gap: 10px; }
+.detail-actions button { flex: 1; }
+.log-types { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.log-type-btn { padding: 12px 8px; background: #222; border: 1px solid #333; border-radius: 10px; font-size: 15px; }
+.log-type-btn.on { border-color: var(--accent); background: #3a2600; color: var(--accent); font-weight: 600; }
+.field {
+  display: block; width: 100%; margin-bottom: 8px;
+  font: inherit; color: var(--text);
+  background: #161616; border: 1px solid #333; border-radius: 10px; padding: 10px 12px;
+}
+textarea.field { resize: vertical; min-height: 120px; }
+label.filter-section-title { display: block; }
+.log-info { margin: 12px 0 0; }
+.check-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; color: var(--muted); font-size: 14px; }
+.badge { flex: none; font-size: 11px; color: var(--muted); border: 1px solid #333; border-radius: 10px; padding: 2px 8px; }
