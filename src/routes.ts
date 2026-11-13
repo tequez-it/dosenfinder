@@ -4,6 +4,7 @@ export type Route =
   /** code/waypoint: Karte auf dieses Ziel ausrichten, mit Linie vom Standort */
   | { name: 'map'; code?: string; waypoint?: string }
   | { name: 'fieldnotes' }
+  | { name: 'lists' }
   | { name: 'log'; code: string }
   | { name: 'import' }
   | { name: 'cache'; code: string }
@@ -11,7 +12,7 @@ export type Route =
 
 /**
  * Einfaches Hash-Routing:
- *   #/liste, #/karte, #/karte/GC123[/PK123], #/import, #/fieldnotes, #/log/GC123, #/cache/GC123, #/nav/GC123, #/nav/GC123/PK123 – leer = Startseite
+ *   #/liste, #/listen, #/karte, #/karte/GC123[/PK123], #/import, #/fieldnotes, #/log/GC123, #/cache/GC123, #/nav/GC123, #/nav/GC123/PK123 – leer = Startseite
  */
 export function parseHash(hash: string): Route {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
@@ -22,6 +23,8 @@ export function parseHash(hash: string): Route {
       return parts[1] ? { name: 'map', code: parts[1], waypoint: parts[2] } : { name: 'map' };
     case 'fieldnotes':
       return { name: 'fieldnotes' };
+    case 'listen':
+      return { name: 'lists' };
     case 'log':
       return parts[1] ? { name: 'log', code: parts[1] } : { name: 'fieldnotes' };
     case 'import':
@@ -47,6 +50,8 @@ export function hashFor(r: Route): string {
         : '#/karte';
     case 'fieldnotes':
       return '#/fieldnotes';
+    case 'lists':
+      return '#/listen';
     case 'log':
       return `#/log/${encodeURIComponent(r.code)}`;
     case 'import':

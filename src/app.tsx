@@ -7,6 +7,7 @@ import { CacheDetail } from './screens/CacheDetail';
 import { Navigate } from './screens/Navigate';
 import { LogScreen } from './screens/LogScreen';
 import { FieldNotesScreen } from './screens/FieldNotesScreen';
+import { ListsScreen } from './screens/ListsScreen';
 import { Header } from './components/Header';
 import { hashFor, parseHash, type Route } from './routes';
 
@@ -95,6 +96,8 @@ export function App() {
           onImport={() => go({ name: 'import' })}
         />
       );
+    case 'lists':
+      return <ListsScreen onBack={() => back({ name: 'list' })} />;
     case 'fieldnotes':
       return <FieldNotesScreen onBack={() => back({ name: 'home' })} />;
     case 'log':

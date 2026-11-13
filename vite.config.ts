@@ -40,6 +40,20 @@ export default defineConfig({
         // Die Karten-Bibliothek ist groß, soll aber offline verfügbar sein
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         navigateFallback: `${base}index.html`,
+        // Angesehene Kartenkacheln merken, damit die Karte dort auch offline geht.
+        // StaleWhileRevalidate: online wird jede Kachel normal neu geladen (kein Vorab-Download),
+        // offline kommt die zuletzt gesehene Version aus dem Speicher.
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/tile\.openstreetmap\.org\//,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'osm-tiles',
+              expiration: { maxEntries: 3000, maxAgeSeconds: 30 * 24 * 60 * 60 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
       },
     }),
   ],
