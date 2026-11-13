@@ -9,7 +9,7 @@ import { sanitizeHtml } from '../sanitize';
 import { usePosition } from '../hooks/usePosition';
 import { Header } from '../components/Header';
 import { TypeIcon } from '../components/TypeIcon';
-import { CACHE_TYPE_LABELS, type CacheDetails, type CacheListInfo, type CacheLog, type CacheSummary, type UserData, type Waypoint } from '../types';
+import { typeDisplayName, type CacheDetails, type CacheListInfo, type CacheLog, type CacheSummary, type UserData, type Waypoint } from '../types';
 
 interface Props {
   code: string;
@@ -157,7 +157,7 @@ function DetailsTab(props: {
       )}
 
       <dl class="info">
-        <Row label="Typ" value={c.typeLabel || CACHE_TYPE_LABELS[c.type]} />
+        <Row label="Typ" value={typeDisplayName(c.typeLabel, c.type)} />
         {c.container && <Row label="Größe" value={c.container} />}
         <Row label="Geocode" value={c.code} />
         {pos && <Row label="Entfernung" value={`${formatDistance(distance(pos, c))} ${cardinal(bearing(pos, c))}`} />}

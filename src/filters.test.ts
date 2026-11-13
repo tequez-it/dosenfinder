@@ -23,3 +23,13 @@ describe('filters', () => {
     expect(matches({ ...base, found: true }, { ...DEFAULT_FILTERS, found: 'open' })).toBe(false);
   });
 });
+
+import { typeDisplayName } from './types';
+describe('Typ-Anzeigename', () => {
+  it('alte GPX-Namen werden übersetzt', () => {
+    expect(typeDisplayName('Unknown Cache', 'mystery')).toBe('Mystery-Cache');
+    expect(typeDisplayName('Cache In Trash Out Event', 'event')).toBe('CITO-Event');
+    expect(typeDisplayName('', 'multi')).toBe('Multi');
+    expect(typeDisplayName('Irgendwas Neues', 'other')).toBe('Irgendwas Neues');
+  });
+});
