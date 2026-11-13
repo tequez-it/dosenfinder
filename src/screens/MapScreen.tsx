@@ -393,7 +393,7 @@ export function MapScreen({ target, onBack, onDetails, onNavigate, onImport }: P
           </div>
         )}
 
-        {!online && <div class="map-banner">Offline – Kartenbilder werden nicht geladen. Caches bleiben sichtbar.</div>}
+        {!online && <div class="map-banner">Offline – nur schon angesehene Kartenbereiche sind verfügbar. Caches bleiben sichtbar.</div>}
 
         {caches !== null && total === 0 && (
           <div class="map-banner">
