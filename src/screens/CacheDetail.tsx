@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { getDetails, getFieldNote, getSummary } from '../db';
+import { deleteOwnWaypoint, getDetails, getFieldNote, getSummary, getUserData, saveNote, saveOwnWaypoint, setCorrectedCoords } from '../db';
+import { attributeName } from '../attributes';
+import { CoordsEditor } from '../components/CoordsEditor';
 import { FIELD_NOTE_TYPES, type FieldNote } from '../fieldnotes';
 import { bearing, cardinal, distance, formatDistance, formatRating, type LatLon } from '../geo';
 import { formatCoords, formatDate, rot13 } from '../format';
@@ -7,7 +9,7 @@ import { sanitizeHtml } from '../sanitize';
 import { usePosition } from '../hooks/usePosition';
 import { Header } from '../components/Header';
 import { TypeIcon } from '../components/TypeIcon';
-import { CACHE_TYPE_LABELS, type CacheDetails, type CacheLog, type CacheSummary } from '../types';
+import { CACHE_TYPE_LABELS, type CacheDetails, type CacheLog, type CacheSummary, type UserData, type Waypoint } from '../types';
 
 interface Props {
   code: string;
@@ -21,7 +23,7 @@ interface Props {
 
 type Tab = 'details' | 'description' | 'logs' | 'waypoints';
 
-type Loaded = { summary: CacheSummary; details: CacheDetails | undefined; note: FieldNote | undefined } | null | 'missing';
+type Loaded = { summary: CacheSummary; details: CacheDetails | undefined; note: FieldNote | undefined; user: UserData } | null | 'missing';
 
 /** Zuletzt gewählter Reiter – bleibt beim Wechsel Details ↔ Navigation erhalten */
 let lastTab: { code: string; tab: Tab } | null = null;
@@ -37,10 +39,13 @@ export function CacheDetail({ code, onBack, onNavigate, onLog, onShowMap }: Prop
   };
   const position = usePosition();
 
-  useEffect(() => {
-    Promise.all([getSummary(code), getDetails(code), getFieldNote(code)])
-      .then(([summary, details, note]) => setData(summary ? { summary, details, note } : 'missing'))
+  const reload = () =>
+    Promise.all([getSummary(code), getDetails(code), getFieldNote(code), getUserData(code)])
+      .then(([summary, details, note, user]) => setData(summary ? { summary, details, note, user } : 'missing'))
       .catch(() => setData('missing'));
+
+  useEffect(() => {
+    void reload();
   }, [code]);
 
   if (data === null) return <div class="screen"><Header title={code} onBack={onBack} /></div>;
@@ -53,14 +58,15 @@ export function CacheDetail({ code, onBack, onNavigate, onLog, onShowMap }: Prop
     );
   }
 
-  const { summary: c, details: d, note } = data;
+  const { summary: c, details: d, note, user } = data;
+  const allWaypoints: Waypoint[] = [...(d?.waypoints ?? []), ...user.ownWaypoints];
   const pos = position.status === 'ok' ? position.pos : null;
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'details', label: 'Details' },
     { id: 'description', label: 'Beschreibung' },
     { id: 'logs', label: `Logbuch${d?.logs.length ? ` (${d.logs.length})` : ''}` },
-    { id: 'waypoints', label: `Wegpunkte${d?.waypoints.length ? ` (${d.waypoints.length})` : ''}` },
+    { id: 'waypoints', label: `Wegpunkte${allWaypoints.length ? ` (${allWaypoints.length})` : ''}` },
   ];
 
   // Wischen nach links/rechts wechselt den Reiter – wie in c:geo
@@ -109,11 +115,13 @@ export function CacheDetail({ code, onBack, onNavigate, onLog, onShowMap }: Prop
 
       <div class="tab-body" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         {tab === 'details' && (
-          <DetailsTab c={c} d={d} note={note} pos={pos} onNavigate={onNavigate} onLog={onLog} onShowMap={onShowMap} />
+          <DetailsTab c={c} d={d} note={note} user={user} pos={pos} onNavigate={onNavigate} onLog={onLog} onShowMap={onShowMap} onChanged={reload} />
         )}
         {tab === 'description' && <DescriptionTab d={d} />}
         {tab === 'logs' && <LogsTab d={d} />}
-        {tab === 'waypoints' && <WaypointsTab c={c} d={d} pos={pos} onNavigate={onNavigate} onShowMap={onShowMap} />}
+        {tab === 'waypoints' && (
+          <WaypointsTab c={c} waypoints={allWaypoints} pos={pos} onNavigate={onNavigate} onShowMap={onShowMap} onChanged={reload} />
+        )}
       </div>
     </div>
   );
@@ -127,12 +135,16 @@ function DetailsTab(props: {
   c: CacheSummary;
   d: CacheDetails | undefined;
   note: FieldNote | undefined;
+  user: UserData;
   pos: LatLon | null;
   onNavigate: (wp?: string) => void;
   onLog: () => void;
   onShowMap: (wp?: string) => void;
+  onChanged: () => void;
 }) {
-  const { c, d, note, pos, onNavigate, onLog, onShowMap } = props;
+  const { c, d, note, user, pos, onNavigate, onLog, onShowMap, onChanged } = props;
+  const [editCoords, setEditCoords] = useState(false);
+  const listing = user.original ?? { lat: c.lat, lon: c.lon };
   return (
     <>
       <div class="detail-top">
@@ -154,9 +166,42 @@ function DetailsTab(props: {
         {c.owner && <Row label="Besitzer" value={c.owner} />}
         {d?.placedAt && <Row label="Versteckt" value={formatDate(d.placedAt)} />}
         {d && (d.state || d.country) && <Row label="Region" value={[d.state, d.country].filter(Boolean).join(', ')} />}
-        <Row label="Koordinaten" value={formatCoords(c.lat, c.lon)} />
+        <Row label="Koordinaten" value={`${formatCoords(c.lat, c.lon)}${c.corrected ? ' (korrigiert)' : ''}`} />
+        {c.corrected && user.original && <Row label="Listing" value={formatCoords(user.original.lat, user.original.lon)} />}
         {c.found && <Row label="Status" value="Gefunden ✓" />}
       </dl>
+
+      {editCoords ? (
+        <div class="content">
+          <CoordsEditor
+            initial={{ lat: c.lat, lon: c.lon }}
+            base={listing}
+            baseLabel="Listing-Koordinaten"
+            pos={pos}
+            onCancel={() => setEditCoords(false)}
+            onSave={async (coords) => {
+              await setCorrectedCoords(c.code, coords);
+              setEditCoords(false);
+              onChanged();
+            }}
+          />
+        </div>
+      ) : (
+        <div class="content coords-links">
+          <button class="text-btn" onClick={() => setEditCoords(true)}>Koordinaten ändern</button>
+          {c.corrected && (
+            <button
+              class="text-btn"
+              onClick={async () => {
+                await setCorrectedCoords(c.code, null);
+                onChanged();
+              }}
+            >
+              Original wiederherstellen
+            </button>
+          )}
+        </div>
+      )}
 
       <div class="content detail-actions">
         <button class="primary-btn" onClick={() => onNavigate()}>Navigieren</button>
@@ -182,12 +227,14 @@ function DetailsTab(props: {
         </section>
       )}
 
+      <NoteBox code={c.code} note={user.note} onChanged={onChanged} />
+
       {d && d.attributes.length > 0 && (
         <section class="section">
           <h2>Attribute</h2>
           <ul class="attributes">
             {d.attributes.map((a) => (
-              <li class={a.inc ? '' : 'attr-no'}>{a.inc ? a.name : `Nicht: ${a.name}`}</li>
+              <li class={a.inc ? '' : 'attr-no'}>{a.inc ? attributeName(a.name) : `Nicht: ${attributeName(a.name)}`}</li>
             ))}
           </ul>
         </section>
@@ -195,6 +242,38 @@ function DetailsTab(props: {
 
       {d?.hint && <HintBox hint={d.hint} />}
     </>
+  );
+}
+
+function NoteBox({ code, note, onChanged }: { code: string; note: string; onChanged: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(note);
+  return (
+    <section class="section">
+      <h2>Persönliche Notiz</h2>
+      {editing ? (
+        <>
+          <textarea class="field" rows={5} value={text} onInput={(e) => setText((e.target as HTMLTextAreaElement).value)} placeholder="Lösungsweg, Zwischenergebnisse, Erinnerungen …" />
+          <div class="detail-actions">
+            <button class="secondary-btn" onClick={() => { setText(note); setEditing(false); }}>Abbrechen</button>
+            <button
+              class="primary-btn"
+              onClick={async () => {
+                await saveNote(code, text);
+                setEditing(false);
+                onChanged();
+              }}
+            >
+              Speichern
+            </button>
+          </div>
+        </>
+      ) : (
+        <button class="note-view" onClick={() => setEditing(true)}>
+          {note ? <span class="plain">{note}</span> : <span class="muted">Tippen, um eine Notiz anzulegen</span>}
+        </button>
+      )}
+    </section>
   );
 }
 
@@ -256,28 +335,89 @@ function LogsTab({ d }: { d: CacheDetails | undefined }) {
 
 function WaypointsTab(props: {
   c: CacheSummary;
-  d: CacheDetails | undefined;
+  waypoints: Waypoint[];
   pos: LatLon | null;
   onNavigate: (wp?: string) => void;
   onShowMap: (wp?: string) => void;
+  onChanged: () => void;
 }) {
-  const { d, pos, onNavigate, onShowMap } = props;
-  if (!d || d.waypoints.length === 0) return <div class="empty">Keine Wegpunkte.</div>;
+  const { c, waypoints, pos, onNavigate, onShowMap, onChanged } = props;
+  // null = kein Formular, 'new' = neuer Wegpunkt, sonst Code des bearbeiteten
+  const [editing, setEditing] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [comment, setComment] = useState('');
+  const editWp = editing && editing !== 'new' ? waypoints.find((w) => w.code === editing) : undefined;
+
+  const startEdit = (w?: Waypoint) => {
+    setEditing(w ? w.code : 'new');
+    setName(w?.name ?? `Eigener Wegpunkt ${waypoints.filter((x) => x.own).length + 1}`);
+    setComment(w?.comment ?? '');
+    window.scrollTo(0, 0);
+  };
+
+  if (editing) {
+    return (
+      <section class="section section-first">
+        <h2>{editing === 'new' ? 'Wegpunkt hinzufügen' : 'Wegpunkt bearbeiten'}</h2>
+        <label class="filter-section-title" for="wp-name">Name</label>
+        <input id="wp-name" class="field" value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} />
+        <label class="filter-section-title" for="wp-comment">Notiz</label>
+        <input id="wp-comment" class="field" value={comment} onInput={(e) => setComment((e.target as HTMLInputElement).value)} />
+        <div class="filter-section-title">Koordinaten</div>
+        <CoordsEditor
+          initial={editWp && editWp.lat !== null && editWp.lon !== null ? { lat: editWp.lat, lon: editWp.lon } : null}
+          base={{ lat: c.lat, lon: c.lon }}
+          baseLabel="Cache-Koordinaten"
+          pos={pos}
+          onCancel={() => setEditing(null)}
+          onSave={async (coords) => {
+            await saveOwnWaypoint(c.code, {
+              code: editWp?.code ?? `EIGEN${Date.now().toString(36).toUpperCase()}`,
+              name: name.trim() || 'Eigener Wegpunkt',
+              type: 'Eigener Wegpunkt',
+              lat: coords.lat,
+              lon: coords.lon,
+              comment: comment.trim(),
+            });
+            setEditing(null);
+            onChanged();
+          }}
+        />
+      </section>
+    );
+  }
+
   return (
     <section class="section section-first">
+      <button class="secondary-btn add-wp" onClick={() => startEdit()}>+ Wegpunkt hinzufügen</button>
+      {waypoints.length === 0 && <div class="empty">Keine Wegpunkte.</div>}
       <ul class="waypoints">
-        {d.waypoints.map((w) => {
+        {waypoints.map((w) => {
           const has = w.lat !== null && w.lon !== null;
           return (
-            <li>
+            <li class={w.own ? 'wp-own' : ''}>
               <div class="wp-main">
                 <div class="wp-name">{w.name}</div>
                 <div class="wp-meta">
-                  {w.code} · {w.type}
+                  {w.own ? 'Eigener Wegpunkt' : `${w.code} · ${w.type}`}
                   {has && pos ? ` · ${formatDistance(distance(pos, { lat: w.lat!, lon: w.lon! }))}` : ''}
                 </div>
                 <div class="wp-meta">{has ? formatCoords(w.lat!, w.lon!) : 'Keine Koordinaten'}</div>
                 {w.comment && <div class="wp-comment">{w.comment}</div>}
+                {w.own && (
+                  <div class="wp-own-actions">
+                    <button class="text-btn" onClick={() => startEdit(w)}>Bearbeiten</button>
+                    <button
+                      class="text-btn danger"
+                      onClick={async () => {
+                        await deleteOwnWaypoint(c.code, w.code);
+                        onChanged();
+                      }}
+                    >
+                      Löschen
+                    </button>
+                  </div>
+                )}
               </div>
               {has && (
                 <div class="wp-actions">
