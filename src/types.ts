@@ -132,3 +132,35 @@ export interface ParseResult {
   caches: ParsedCache[];
   waypoints: ParsedWaypoint[];
 }
+
+/**
+ * Anzeigename für die Typ-Bezeichnung aus der GPX-Datei. geocaching.com
+ * schreibt in GPX-Dateien noch alte Namen, z. B. "Unknown Cache" für Mysteries.
+ */
+const TYPE_DISPLAY: Record<string, string> = {
+  'traditional cache': 'Traditional Cache',
+  'multi-cache': 'Multi-Cache',
+  'unknown cache': 'Mystery-Cache',
+  'mystery cache': 'Mystery-Cache',
+  'letterbox hybrid': 'Letterbox Hybrid',
+  'wherigo cache': 'Wherigo-Cache',
+  'earthcache': 'EarthCache',
+  'virtual cache': 'Virtual Cache',
+  'webcam cache': 'Webcam-Cache',
+  'event cache': 'Event-Cache',
+  'mega-event cache': 'Mega-Event',
+  'giga-event cache': 'Giga-Event',
+  'cache in trash out event': 'CITO-Event',
+  'community celebration event': 'Community Celebration Event',
+  'project ape cache': 'Project-APE-Cache',
+  'gps adventures exhibit': 'GPS Adventures Exhibit',
+  'geocaching hq': 'Geocaching HQ',
+  'geocaching hq celebration': 'Geocaching HQ Celebration',
+  'geocaching hq block party': 'Geocaching HQ Block Party',
+};
+
+export function typeDisplayName(typeLabel: string, type: CacheType): string {
+  const key = typeLabel.trim().toLowerCase();
+  if (!key) return CACHE_TYPE_LABELS[type];
+  return TYPE_DISPLAY[key] ?? typeLabel;
+}
