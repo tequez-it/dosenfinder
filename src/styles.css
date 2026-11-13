@@ -282,7 +282,7 @@ a.cache-row:active { background: #1a1a1a; }
 
 /* Field Notes */
 .detail-actions { display: flex; gap: 10px; }
-.detail-actions button { flex: 1; }
+.detail-actions > * { flex: 1 1 0; min-width: 0; }
 .log-types { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
 .log-type-btn { padding: 12px 8px; background: #222; border: 1px solid #333; border-radius: 10px; font-size: 15px; }
 .log-type-btn.on { border-color: var(--accent); background: #3a2600; color: var(--accent); font-weight: 600; }
@@ -296,3 +296,31 @@ label.filter-section-title { display: block; }
 .log-info { margin: 12px 0 0; }
 .check-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; color: var(--muted); font-size: 14px; }
 .badge { flex: none; font-size: 11px; color: var(--muted); border: 1px solid #333; border-radius: 10px; padding: 2px 8px; }
+
+/* Reiter in den Cache-Details (wie c:geo) */
+.tabs {
+  position: sticky; top: calc(58px + env(safe-area-inset-top)); z-index: 9;
+  display: flex; overflow-x: auto; scrollbar-width: none;
+  background: var(--bar); border-bottom: 1px solid var(--line);
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tabs button {
+  flex: 1 0 auto; padding: 12px 10px;
+  background: none; border: 0; border-bottom: 3px solid transparent;
+  color: var(--muted); font-size: 14px; font-weight: 600; white-space: nowrap;
+}
+.tabs .tab-on { color: var(--text); border-bottom-color: var(--accent); }
+.tab-body { min-height: 60vh; }
+.section-first { border-top: 0; }
+.detail-actions-2 { padding-top: 0; }
+a.secondary-btn { display: flex; align-items: center; justify-content: center; text-decoration: none; }
+.wp-actions { display: flex; }
+
+/* Karte mit Ziel */
+.map-target { right: auto; font-size: 15px; }
+.wp-dot { width: 18px; height: 18px; border-radius: 9px; background: #6a5acd; border: 2px solid #fff; flex: none; margin: 0 8px; }
+
+/* Suche und Sortierung in der Liste */
+.list-tools { display: flex; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--line); }
+.list-tools .search { flex: 1; margin: 0; padding: 8px 12px; min-width: 0; }
+.list-tools select { flex: none; }
