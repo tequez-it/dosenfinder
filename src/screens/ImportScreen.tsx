@@ -2,7 +2,8 @@ import { useRef, useState } from 'preact/hooks';
 import { Header } from '../components/Header';
 import { parseFile } from '../gpx/import';
 import { GpxError } from '../gpx/parse';
-import { clearAll, requestPersistentStorage, saveImport, type ImportStats } from '../db';
+import { BackupError, clearAll, createBackup, requestPersistentStorage, restoreBackup, saveImport, type ImportStats } from '../db';
+import { shareOrDownload } from '../share';
 
 interface Props {
   onBack: () => void;
@@ -103,6 +104,8 @@ export function ImportScreen({ onBack, onShowList }: Props) {
           </ol>
         </details>
 
+        <BackupSection />
+
         <div class="danger-zone">
           {!confirmClear ? (
             <button class="text-btn danger" onClick={() => setConfirmClear(true)}>Alle Caches löschen</button>
@@ -116,5 +119,62 @@ export function ImportScreen({ onBack, onShowList }: Props) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Sicherung aller Daten als Datei – schützt vor Verlust, z. B. wenn die App vom Homescreen gelöscht wird. */
+function BackupSection() {
+  const input = useRef<HTMLInputElement>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const doBackup = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const b = await createBackup();
+      const date = b.exportedAt.slice(0, 10);
+      const r = await shareOrDownload(JSON.stringify(b), `dosenfinder-sicherung-${date}.json`, 'application/json', 'Dosenfinder-Sicherung');
+      if (r !== 'cancelled') {
+        setMsg({ ok: true, text: `Sicherung erstellt: ${b.caches.length} Caches, ${b.fieldnotes.length} Field Notes, ${b.userdata.length} Caches mit eigenen Daten.` });
+      }
+    } catch {
+      setMsg({ ok: false, text: 'Sicherung fehlgeschlagen.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onFile = async (e: Event) => {
+    const el = e.target as HTMLInputElement;
+    const file = el.files?.[0];
+    el.value = '';
+    if (!file) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await restoreBackup(JSON.parse(await file.text()));
+      setMsg({ ok: true, text: `Sicherung eingespielt: ${r.caches} Caches, ${r.fieldnotes} Field Notes, ${r.userdata} Caches mit eigenen Daten.` });
+    } catch (err) {
+      setMsg({ ok: false, text: err instanceof BackupError ? err.message : 'Die Datei konnte nicht gelesen werden.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section class="backup">
+      <h2 class="filter-section-title">Datensicherung</h2>
+      <p class="muted">
+        Sichert alle Caches, Field Notes, Notizen, korrigierten Koordinaten und eigenen Wegpunkte in eine Datei. Vor
+        dem Löschen der App vom Homescreen unbedingt sichern.
+      </p>
+      <div class="detail-actions">
+        <button class="secondary-btn" disabled={busy} onClick={doBackup}>Sicherung erstellen</button>
+        <button class="secondary-btn" disabled={busy} onClick={() => input.current?.click()}>Einspielen</button>
+      </div>
+      <input ref={input} type="file" class="hidden-input" onChange={onFile} />
+      {msg && <p class={`status ${msg.ok ? 'status-ok' : 'status-error'}`}>{msg.text}</p>}
+    </section>
   );
 }

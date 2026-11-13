@@ -4,7 +4,7 @@ import type { GeoJSONSource, Map as MLMap, MapMouseEvent, PointLike } from 'mapl
 import type { FeatureCollection } from 'geojson';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { getAllSummaries, getDetails } from '../db';
+import { getAllSummaries, getWaypoints } from '../db';
 import { bearing, cardinal, distance, formatDistance, formatRating } from '../geo';
 import { formatCoords } from '../format';
 import { isDefault, loadFilters, matches, saveFilters, type Filters } from '../filters';
@@ -273,8 +273,8 @@ export function MapScreen({ target, onBack, onDetails, onNavigate, onImport }: P
       setWaypoints([]);
       return;
     }
-    getDetails(selected)
-      .then((d) => setWaypoints(d?.waypoints ?? []))
+    getWaypoints(selected)
+      .then(setWaypoints)
       .catch(() => setWaypoints([]));
   }, [selected]);
 

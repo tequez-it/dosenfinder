@@ -5,6 +5,7 @@ import { formatDate } from '../format';
 import { Header } from '../components/Header';
 import { TypeIcon } from '../components/TypeIcon';
 import { hashFor } from '../routes';
+import { shareOrDownload } from '../share';
 import type { CacheSummary } from '../types';
 
 interface Props {
@@ -12,31 +13,6 @@ interface Props {
 }
 
 const FILE_NAME = 'geocache_visits.txt';
-
-type ShareResult = 'shared' | 'downloaded' | 'cancelled';
-
-/** iPhone: Teilen-Menü (z. B. „In Dateien sichern“). Sonst normaler Download. */
-async function shareOrDownload(bytes: Uint8Array<ArrayBuffer>): Promise<ShareResult> {
-  const file = new File([bytes], FILE_NAME, { type: 'text/plain' });
-  if (navigator.canShare?.({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file], title: 'Field Notes' });
-      return 'shared';
-    } catch (e) {
-      if ((e as DOMException).name === 'AbortError') return 'cancelled';
-      // Teilen nicht möglich – auf Download ausweichen
-    }
-  }
-  const url = URL.createObjectURL(file);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = FILE_NAME;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
-  return 'downloaded';
-}
 
 export function FieldNotesScreen({ onBack }: Props) {
   const [notes, setNotes] = useState<FieldNote[] | null>(null);
@@ -62,7 +38,7 @@ export function FieldNotesScreen({ onBack }: Props) {
 
   const doExport = async () => {
     setMessage('');
-    const result = await shareOrDownload(encodeUtf16le(buildFieldNotesText(toExport)));
+    const result = await shareOrDownload(encodeUtf16le(buildFieldNotesText(toExport)), FILE_NAME, 'text/plain', 'Field Notes');
     if (result === 'cancelled') return;
     await markFieldNotesExported(toExport.map((n) => n.code));
     setMessage(`${toExport.length} Field Note${toExport.length === 1 ? '' : 's'} exportiert.`);

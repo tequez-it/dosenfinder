@@ -324,3 +324,25 @@ a.secondary-btn { display: flex; align-items: center; justify-content: center; t
 .list-tools { display: flex; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--line); }
 .list-tools .search { flex: 1; margin: 0; padding: 8px 12px; min-width: 0; }
 .list-tools select { flex: none; }
+
+/* Koordinaten-Editor, Notiz, eigene Wegpunkte */
+.coords-editor { display: flex; flex-direction: column; gap: 8px; }
+.coords-input { font-variant-numeric: tabular-nums; margin: 0; }
+.coords-quick { display: flex; gap: 16px; flex-wrap: wrap; }
+.coords-quick .text-btn, .coords-links .text-btn { padding: 4px 0; }
+.coords-links { display: flex; gap: 20px; padding-top: 0; padding-bottom: 0; }
+.coords-row { display: flex; align-items: center; gap: 8px; }
+.coords-row .field { margin: 0; flex: 1; }
+.coords-row select { flex: 1; }
+.filter-label-wide { width: 80px; color: var(--muted); font-size: 14px; }
+.coords-msg { margin: 0; font-size: 14px; }
+.coords-actions { padding: 0; }
+.note-view { display: block; width: 100%; text-align: left; padding: 12px; background: var(--surface); border: 1px solid #333; border-radius: 10px; }
+.muted { color: var(--muted); }
+.add-wp { margin-bottom: 8px; }
+.wp-own .wp-name::after { content: ' ★'; color: var(--accent); }
+.wp-own-actions { display: flex; gap: 16px; }
+.wp-own-actions .text-btn { padding: 4px 0; }
+
+.backup { margin-top: 24px; border-top: 1px solid var(--line); padding-top: 8px; }
+.backup p.muted { font-size: 14px; }

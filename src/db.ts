@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { CacheDetails, CacheSummary, ParseResult } from './types';
+import type { CacheDetails, CacheSummary, LatLonPair, ParseResult, UserData, Waypoint } from './types';
 import { countsAsFind, type FieldNote } from './fieldnotes';
 
 /*
@@ -7,18 +7,20 @@ import { countsAsFind, type FieldNote } from './fieldnotes';
  * - caches:  Kurzdaten für Liste/Karte (klein, wird komplett geladen)
  * - details: Beschreibung, Hint, Logs, Wegpunkte (nur bei Bedarf geladen)
  * - fieldnotes: eigene Logs, die noch auf geocaching.com hochgeladen werden (ab Version 2)
+ * - userdata: Notiz, korrigierte Koordinaten, eigene Wegpunkte (ab Version 3)
  */
 interface DosenDB extends DBSchema {
   caches: { key: string; value: CacheSummary };
   details: { key: string; value: CacheDetails };
   fieldnotes: { key: string; value: FieldNote };
+  userdata: { key: string; value: UserData };
 }
 
 let dbPromise: Promise<IDBPDatabase<DosenDB>> | null = null;
 
 function db(): Promise<IDBPDatabase<DosenDB>> {
   if (!dbPromise) {
-    dbPromise = openDB<DosenDB>('dosenfinder', 2, {
+    dbPromise = openDB<DosenDB>('dosenfinder', 3, {
       upgrade(d, oldVersion) {
         if (oldVersion < 1) {
           d.createObjectStore('caches', { keyPath: 'code' });
@@ -26,6 +28,9 @@ function db(): Promise<IDBPDatabase<DosenDB>> {
         }
         if (oldVersion < 2) {
           d.createObjectStore('fieldnotes', { keyPath: 'code' });
+        }
+        if (oldVersion < 3) {
+          d.createObjectStore('userdata', { keyPath: 'code' });
         }
       },
     });
@@ -43,9 +48,10 @@ export interface ImportStats {
 
 export async function saveImport(result: ParseResult): Promise<ImportStats> {
   const d = await db();
-  const tx = d.transaction(['caches', 'details'], 'readwrite');
+  const tx = d.transaction(['caches', 'details', 'userdata'], 'readwrite');
   const caches = tx.objectStore('caches');
   const details = tx.objectStore('details');
+  const userdata = tx.objectStore('userdata');
   const stats: ImportStats = { newCaches: 0, updatedCaches: 0, waypointsAttached: 0, waypointsOrphaned: 0 };
 
   // Details dieses Imports im Speicher halten, um Wegpunkte anzuhängen
@@ -63,6 +69,14 @@ export async function saveImport(result: ParseResult): Promise<ImportStats> {
     }
     // Vorhandene Wegpunkte behalten, falls diese Datei keine mitliefert
     if (oldDetails && det.waypoints.length === 0) det.waypoints = oldDetails.waypoints;
+    // Korrigierte Koordinaten des Nutzers bleiben erhalten
+    const ud = await userdata.get(summary.code);
+    if (ud?.corrected) {
+      await userdata.put({ ...ud, original: { lat: summary.lat, lon: summary.lon } });
+      summary.lat = ud.corrected.lat;
+      summary.lon = ud.corrected.lon;
+      summary.corrected = true;
+    }
     await caches.put(summary);
     touched.set(summary.code, det);
   }
@@ -164,4 +178,107 @@ export async function deleteExportedFieldNotes(): Promise<number> {
   }
   await tx.done;
   return count;
+}
+
+/* ---------- Eigene Daten (Notiz, korrigierte Koordinaten, eigene Wegpunkte) ---------- */
+
+function emptyUserData(code: string): UserData {
+  return { code, note: '', corrected: null, original: null, ownWaypoints: [] };
+}
+
+export async function getUserData(code: string): Promise<UserData> {
+  return (await (await db()).get('userdata', code)) ?? emptyUserData(code);
+}
+
+async function updateUserData(code: string, change: (u: UserData) => UserData): Promise<UserData> {
+  const d = await db();
+  const tx = d.transaction('userdata', 'readwrite');
+  const next = change((await tx.store.get(code)) ?? emptyUserData(code));
+  await tx.store.put(next);
+  await tx.done;
+  return next;
+}
+
+export async function saveNote(code: string, note: string): Promise<UserData> {
+  return updateUserData(code, (u) => ({ ...u, note }));
+}
+
+/** Setzt korrigierte Koordinaten (oder null = Original wiederherstellen). */
+export async function setCorrectedCoords(code: string, coords: LatLonPair | null): Promise<void> {
+  const d = await db();
+  const tx = d.transaction(['caches', 'userdata'], 'readwrite');
+  const c = await tx.objectStore('caches').get(code);
+  if (!c) {
+    await tx.done;
+    return;
+  }
+  const u = (await tx.objectStore('userdata').get(code)) ?? emptyUserData(code);
+  const original = u.original ?? (c.corrected ? null : { lat: c.lat, lon: c.lon });
+  if (coords) {
+    await tx.objectStore('userdata').put({ ...u, corrected: coords, original });
+    await tx.objectStore('caches').put({ ...c, lat: coords.lat, lon: coords.lon, corrected: true });
+  } else {
+    await tx.objectStore('userdata').put({ ...u, corrected: null });
+    const back = original ?? { lat: c.lat, lon: c.lon };
+    await tx.objectStore('caches').put({ ...c, lat: back.lat, lon: back.lon, corrected: false });
+  }
+  await tx.done;
+}
+
+export async function saveOwnWaypoint(code: string, wp: Waypoint): Promise<void> {
+  await updateUserData(code, (u) => ({
+    ...u,
+    ownWaypoints: [...u.ownWaypoints.filter((w) => w.code !== wp.code), { ...wp, own: true }],
+  }));
+}
+
+export async function deleteOwnWaypoint(code: string, wpCode: string): Promise<void> {
+  await updateUserData(code, (u) => ({ ...u, ownWaypoints: u.ownWaypoints.filter((w) => w.code !== wpCode) }));
+}
+
+/** Wegpunkte aus dem Listing plus eigene Wegpunkte */
+export async function getWaypoints(code: string): Promise<Waypoint[]> {
+  const [det, u] = await Promise.all([getDetails(code), getUserData(code)]);
+  return [...(det?.waypoints ?? []), ...u.ownWaypoints];
+}
+
+/* ---------- Datensicherung ---------- */
+
+export interface Backup {
+  app: 'dosenfinder';
+  version: 1;
+  exportedAt: string;
+  caches: CacheSummary[];
+  details: CacheDetails[];
+  fieldnotes: FieldNote[];
+  userdata: UserData[];
+}
+
+export async function createBackup(): Promise<Backup> {
+  const d = await db();
+  const [caches, details, fieldnotes, userdata] = await Promise.all([
+    d.getAll('caches'),
+    d.getAll('details'),
+    d.getAll('fieldnotes'),
+    d.getAll('userdata'),
+  ]);
+  return { app: 'dosenfinder', version: 1, exportedAt: new Date().toISOString(), caches, details, fieldnotes, userdata };
+}
+
+export class BackupError extends Error {}
+
+/** Spielt eine Sicherung ein. Vorhandene Einträge mit gleichem Code werden ersetzt, andere bleiben. */
+export async function restoreBackup(b: unknown): Promise<{ caches: number; fieldnotes: number; userdata: number }> {
+  const data = b as Partial<Backup>;
+  if (!data || data.app !== 'dosenfinder' || !Array.isArray(data.caches)) {
+    throw new BackupError('Das ist keine Dosenfinder-Sicherung.');
+  }
+  const d = await db();
+  const tx = d.transaction(['caches', 'details', 'fieldnotes', 'userdata'], 'readwrite');
+  for (const c of data.caches) await tx.objectStore('caches').put(c);
+  for (const x of data.details ?? []) await tx.objectStore('details').put(x);
+  for (const x of data.fieldnotes ?? []) await tx.objectStore('fieldnotes').put(x);
+  for (const x of data.userdata ?? []) await tx.objectStore('userdata').put(x);
+  await tx.done;
+  return { caches: data.caches.length, fieldnotes: data.fieldnotes?.length ?? 0, userdata: data.userdata?.length ?? 0 };
 }

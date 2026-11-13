@@ -43,3 +43,17 @@ export function formatDistance(m: number): string {
 export function formatRating(v: number | null): string {
   return v === null ? '?' : nf1.format(v);
 }
+
+/**
+ * Wegpunkt-Projektion: Punkt in Richtung (Grad) und Entfernung (Meter) vom Start aus.
+ * Wird bei Multis und Mysteries oft gebraucht ("Peile 245° und gehe 120 m").
+ */
+export function project(start: LatLon, bearingDeg: number, meters: number): LatLon {
+  const d = meters / R;
+  const b = rad(bearingDeg);
+  const lat1 = rad(start.lat);
+  const lon1 = rad(start.lon);
+  const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(b));
+  const lon2 = lon1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
+  return { lat: deg(lat2), lon: ((deg(lon2) + 540) % 360) - 180 };
+}

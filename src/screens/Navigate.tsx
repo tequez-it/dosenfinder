@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { getDetails, getSummary } from '../db';
+import { getSummary, getWaypoints } from '../db';
 import { bearing, cardinal, distance, formatDistance } from '../geo';
 import { formatCoords } from '../format';
 import { nextRotation } from '../compass';
@@ -38,7 +38,7 @@ export function Navigate({ code, waypoint, onBack, onShowMap }: Props) {
       if (!waypoint) {
         return setTarget({ lat: summary.lat, lon: summary.lon, title: summary.name, subtitle: summary.code });
       }
-      const wp = (await getDetails(code))?.waypoints.find((w) => w.code === waypoint);
+      const wp = (await getWaypoints(code)).find((w) => w.code === waypoint);
       if (!wp || wp.lat === null || wp.lon === null) return setTarget('missing');
       setTarget({ lat: wp.lat, lon: wp.lon, title: wp.name, subtitle: `${wp.code} · ${summary.name}` });
     })().catch(() => setTarget('missing'));

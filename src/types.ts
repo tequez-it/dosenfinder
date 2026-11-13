@@ -43,6 +43,8 @@ export interface CacheSummary {
   archived: boolean;
   /** Zeitpunkt des Imports (ms) */
   importedAt: number;
+  /** lat/lon sind vom Nutzer korrigiert (z. B. gelöstes Mystery-Final) */
+  corrected?: boolean;
 }
 
 export interface CacheLog {
@@ -67,6 +69,27 @@ export interface Waypoint {
   lat: number | null;
   lon: number | null;
   comment: string;
+  /** vom Nutzer selbst angelegt */
+  own?: boolean;
+}
+
+export interface LatLonPair {
+  lat: number;
+  lon: number;
+}
+
+/**
+ * Eigene Daten zu einem Cache. Getrennt gespeichert, damit ein neuer Import
+ * sie nie überschreibt.
+ */
+export interface UserData {
+  code: string;
+  note: string;
+  /** korrigierte Koordinaten (null = keine) */
+  corrected: LatLonPair | null;
+  /** Koordinaten laut Listing, um sie wiederherzustellen */
+  original: LatLonPair | null;
+  ownWaypoints: Waypoint[];
 }
 
 /** Alles, was nur in der Detailansicht gebraucht wird. */
