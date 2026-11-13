@@ -1,8 +1,9 @@
-import { useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { Header } from '../components/Header';
 import { parseFile } from '../gpx/import';
 import { GpxError } from '../gpx/parse';
-import { BackupError, clearAll, createBackup, requestPersistentStorage, restoreBackup, saveImport, type ImportStats } from '../db';
+import { BackupError, clearAll, createBackup, createList, getLists, requestPersistentStorage, restoreBackup, saveImport, type ImportStats } from '../db';
+import type { CacheListInfo } from '../types';
 import { shareOrDownload } from '../share';
 
 interface Props {
@@ -23,6 +24,14 @@ export function ImportScreen({ onBack, onShowList }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [confirmClear, setConfirmClear] = useState(false);
+  const [lists, setLists] = useState<CacheListInfo[]>([]);
+  // '' = keine Liste, '__new' = neue Liste anlegen
+  const [targetList, setTargetList] = useState('');
+  const [newListName, setNewListName] = useState('');
+
+  useEffect(() => {
+    getLists().then(setLists).catch(() => setLists([]));
+  }, []);
 
   const onFile = async (e: Event) => {
     const el = e.target as HTMLInputElement;
@@ -36,7 +45,15 @@ export function ImportScreen({ onBack, onShowList }: Props) {
         setStatus({ kind: 'error', message: 'In der Datei wurden keine Caches gefunden.' });
         return;
       }
-      const stats = await saveImport(parsed);
+      let listId = targetList;
+      if (targetList === '__new') {
+        const l = await createList(newListName || file.name.replace(/\.(gpx|zip)$/i, ''));
+        listId = l.id;
+        setLists(await getLists());
+        setTargetList(l.id);
+        setNewListName('');
+      }
+      const stats = await saveImport(parsed, listId || undefined);
       void requestPersistentStorage();
       setStatus({ kind: 'done', file: file.name, stats, total: parsed.caches.length });
     } catch (err) {
@@ -63,6 +80,26 @@ export function ImportScreen({ onBack, onShowList }: Props) {
           Wähle eine <b>GPX-Datei</b> oder eine <b>Pocket-Query-ZIP</b> von geocaching.com. Die Caches werden nur auf
           diesem Gerät gespeichert.
         </p>
+
+        <div class="import-list">
+          <label class="filter-section-title" for="import-list">Zusätzlich in Liste</label>
+          <select id="import-list" value={targetList} onChange={(e) => setTargetList((e.target as HTMLSelectElement).value)}>
+            <option value="">Keine Liste</option>
+            {lists.map((l) => (
+              <option value={l.id}>{l.name}</option>
+            ))}
+            <option value="__new">Neue Liste …</option>
+          </select>
+          {targetList === '__new' && (
+            <input
+              class="field"
+              value={newListName}
+              placeholder="Name (sonst Dateiname)"
+              onInput={(e) => setNewListName((e.target as HTMLInputElement).value)}
+              aria-label="Name der neuen Liste"
+            />
+          )}
+        </div>
 
         <input ref={input} type="file" class="hidden-input" onChange={onFile} />
         <button class="primary-btn" disabled={status.kind === 'busy'} onClick={() => input.current?.click()}>

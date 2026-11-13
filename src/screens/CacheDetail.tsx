@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { deleteOwnWaypoint, getDetails, getFieldNote, getSummary, getUserData, saveNote, saveOwnWaypoint, setCorrectedCoords } from '../db';
+import { deleteOwnWaypoint, getDetails, getFieldNote, getLists, getSummary, getUserData, saveNote, saveOwnWaypoint, setCacheLists, setCorrectedCoords, setFound } from '../db';
 import { attributeName } from '../attributes';
 import { CoordsEditor } from '../components/CoordsEditor';
 import { FIELD_NOTE_TYPES, type FieldNote } from '../fieldnotes';
@@ -9,7 +9,7 @@ import { sanitizeHtml } from '../sanitize';
 import { usePosition } from '../hooks/usePosition';
 import { Header } from '../components/Header';
 import { TypeIcon } from '../components/TypeIcon';
-import { CACHE_TYPE_LABELS, type CacheDetails, type CacheLog, type CacheSummary, type UserData, type Waypoint } from '../types';
+import { CACHE_TYPE_LABELS, type CacheDetails, type CacheListInfo, type CacheLog, type CacheSummary, type UserData, type Waypoint } from '../types';
 
 interface Props {
   code: string;
@@ -229,6 +229,20 @@ function DetailsTab(props: {
 
       <NoteBox code={c.code} note={user.note} onChanged={onChanged} />
 
+      <ListsBox code={c.code} selected={user.lists ?? []} onChanged={onChanged} />
+
+      <div class="content found-toggle">
+        <button
+          class="text-btn"
+          onClick={async () => {
+            await setFound(c.code, !c.found);
+            onChanged();
+          }}
+        >
+          {c.found ? 'Als nicht gefunden markieren' : 'Als gefunden markieren'}
+        </button>
+      </div>
+
       {d && d.attributes.length > 0 && (
         <section class="section">
           <h2>Attribute</h2>
@@ -271,6 +285,48 @@ function NoteBox({ code, note, onChanged }: { code: string; note: string; onChan
       ) : (
         <button class="note-view" onClick={() => setEditing(true)}>
           {note ? <span class="plain">{note}</span> : <span class="muted">Tippen, um eine Notiz anzulegen</span>}
+        </button>
+      )}
+    </section>
+  );
+}
+
+function ListsBox({ code, selected, onChanged }: { code: string; selected: string[]; onChanged: () => void }) {
+  const [lists, setLists] = useState<CacheListInfo[] | null>(null);
+  const [editing, setEditing] = useState(false);
+  useEffect(() => {
+    getLists().then(setLists).catch(() => setLists([]));
+  }, []);
+  if (!lists) return null;
+  const names = lists.filter((l) => selected.includes(l.id)).map((l) => l.name);
+  return (
+    <section class="section">
+      <h2>Listen</h2>
+      {lists.length === 0 ? (
+        <p class="muted">
+          Keine eigenen Listen. <a class="link" href="#/listen">Liste anlegen</a>
+        </p>
+      ) : editing ? (
+        <div class="list-checks">
+          {lists.map((l) => (
+            <label class="check-row">
+              <input
+                type="checkbox"
+                checked={selected.includes(l.id)}
+                onChange={async (e) => {
+                  const on = (e.target as HTMLInputElement).checked;
+                  await setCacheLists(code, on ? [...selected, l.id] : selected.filter((x) => x !== l.id));
+                  onChanged();
+                }}
+              />
+              {l.name}
+            </label>
+          ))}
+          <button class="text-btn" onClick={() => setEditing(false)}>Fertig</button>
+        </div>
+      ) : (
+        <button class="note-view" onClick={() => setEditing(true)}>
+          {names.length ? names.join(', ') : <span class="muted">In keiner Liste – tippen zum Zuordnen</span>}
         </button>
       )}
     </section>

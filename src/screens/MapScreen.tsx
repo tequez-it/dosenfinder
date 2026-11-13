@@ -12,6 +12,8 @@ import { usePosition } from '../hooks/usePosition';
 import { Header } from '../components/Header';
 import { TypeIcon, TYPE_STYLE } from '../components/TypeIcon';
 import { FilterPanel } from '../components/FilterPanel';
+import { ListPicker } from '../components/ListPicker';
+import { useLists } from '../hooks/useLists';
 import { createIcon, iconName, ICON_SIZE } from '../map/icons';
 import { getLastView, OSM_STYLE, setLastView } from '../map/mapView';
 import { CACHE_TYPE_LABELS, type CacheSummary, type CacheType, type Waypoint } from '../types';
@@ -74,6 +76,7 @@ export function MapScreen({ target, onBack, onDetails, onNavigate, onImport }: P
   const [online, setOnline] = useState(navigator.onLine);
   const position = usePosition();
   const pos = position.status === 'ok' ? position.pos : null;
+  const listsState = useLists();
 
   useEffect(() => {
     getAllSummaries().then(setCaches).catch(() => setCaches([]));
@@ -87,7 +90,10 @@ export function MapScreen({ target, onBack, onDetails, onNavigate, onImport }: P
     };
   }, []);
 
-  const visible = useMemo(() => (caches ?? []).filter((c) => matches(c, filters)), [caches, filters]);
+  const visible = useMemo(
+    () => (caches ?? []).filter((c) => listsState.inActive(c.code) && matches(c, filters)),
+    [caches, filters, listsState.active, listsState.memberships],
+  );
   const availableTypes = useMemo(
     () => [...new Set<CacheType>((caches ?? []).map((c) => c.type))].sort(),
     [caches],
@@ -356,7 +362,7 @@ export function MapScreen({ target, onBack, onDetails, onNavigate, onImport }: P
         actions={
           total > 0 && (
             <button
-              class={`icon-btn ${!isDefault(filters) ? 'icon-btn-active' : ''}`}
+              class={`icon-btn ${!isDefault(filters) || listsState.active ? 'icon-btn-active' : ''}`}
               onClick={() => setShowFilters(!showFilters)}
               aria-label="Filter"
               aria-expanded={showFilters}
@@ -374,6 +380,9 @@ export function MapScreen({ target, onBack, onDetails, onNavigate, onImport }: P
 
         {showFilters && (
           <div class="map-overlay-top">
+            <div class="map-list-picker">
+              <ListPicker state={listsState} total={total} />
+            </div>
             <FilterPanel filters={filters} availableTypes={availableTypes} onChange={updateFilters} />
           </div>
         )}

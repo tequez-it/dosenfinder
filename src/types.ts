@@ -90,6 +90,15 @@ export interface UserData {
   /** Koordinaten laut Listing, um sie wiederherzustellen */
   original: LatLonPair | null;
   ownWaypoints: Waypoint[];
+  /** IDs der eigenen Listen, in denen der Cache liegt */
+  lists?: string[];
+}
+
+/** Eigene Cache-Liste (wie "Listen" in c:geo) */
+export interface CacheListInfo {
+  id: string;
+  name: string;
+  createdAt: number;
 }
 
 /** Alles, was nur in der Detailansicht gebraucht wird. */

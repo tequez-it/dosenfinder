@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { CacheDetails, CacheSummary, LatLonPair, ParseResult, UserData, Waypoint } from './types';
+import type { CacheDetails, CacheListInfo, CacheSummary, LatLonPair, ParseResult, UserData, Waypoint } from './types';
 import { countsAsFind, type FieldNote } from './fieldnotes';
 
 /*
@@ -7,20 +7,22 @@ import { countsAsFind, type FieldNote } from './fieldnotes';
  * - caches:  Kurzdaten für Liste/Karte (klein, wird komplett geladen)
  * - details: Beschreibung, Hint, Logs, Wegpunkte (nur bei Bedarf geladen)
  * - fieldnotes: eigene Logs, die noch auf geocaching.com hochgeladen werden (ab Version 2)
- * - userdata: Notiz, korrigierte Koordinaten, eigene Wegpunkte (ab Version 3)
+ * - userdata: Notiz, korrigierte Koordinaten, eigene Wegpunkte, Listen-Zugehörigkeit (ab Version 3)
+ * - lists: eigene Cache-Listen (ab Version 4)
  */
 interface DosenDB extends DBSchema {
   caches: { key: string; value: CacheSummary };
   details: { key: string; value: CacheDetails };
   fieldnotes: { key: string; value: FieldNote };
   userdata: { key: string; value: UserData };
+  lists: { key: string; value: CacheListInfo };
 }
 
 let dbPromise: Promise<IDBPDatabase<DosenDB>> | null = null;
 
 function db(): Promise<IDBPDatabase<DosenDB>> {
   if (!dbPromise) {
-    dbPromise = openDB<DosenDB>('dosenfinder', 3, {
+    dbPromise = openDB<DosenDB>('dosenfinder', 4, {
       upgrade(d, oldVersion) {
         if (oldVersion < 1) {
           d.createObjectStore('caches', { keyPath: 'code' });
@@ -31,6 +33,9 @@ function db(): Promise<IDBPDatabase<DosenDB>> {
         }
         if (oldVersion < 3) {
           d.createObjectStore('userdata', { keyPath: 'code' });
+        }
+        if (oldVersion < 4) {
+          d.createObjectStore('lists', { keyPath: 'id' });
         }
       },
     });
@@ -46,7 +51,8 @@ export interface ImportStats {
   waypointsOrphaned: number;
 }
 
-export async function saveImport(result: ParseResult): Promise<ImportStats> {
+/** listId: importierte Caches zusätzlich in diese eigene Liste legen */
+export async function saveImport(result: ParseResult, listId?: string): Promise<ImportStats> {
   const d = await db();
   const tx = d.transaction(['caches', 'details', 'userdata'], 'readwrite');
   const caches = tx.objectStore('caches');
@@ -70,12 +76,18 @@ export async function saveImport(result: ParseResult): Promise<ImportStats> {
     // Vorhandene Wegpunkte behalten, falls diese Datei keine mitliefert
     if (oldDetails && det.waypoints.length === 0) det.waypoints = oldDetails.waypoints;
     // Korrigierte Koordinaten des Nutzers bleiben erhalten
-    const ud = await userdata.get(summary.code);
+    let ud = await userdata.get(summary.code);
     if (ud?.corrected) {
-      await userdata.put({ ...ud, original: { lat: summary.lat, lon: summary.lon } });
-      summary.lat = ud.corrected.lat;
-      summary.lon = ud.corrected.lon;
+      ud = { ...ud, original: { lat: summary.lat, lon: summary.lon } };
+      await userdata.put(ud);
+      summary.lat = ud.corrected!.lat;
+      summary.lon = ud.corrected!.lon;
       summary.corrected = true;
+    }
+    if (listId) {
+      const base = ud ?? emptyUserData(summary.code);
+      const lists = base.lists ?? [];
+      if (!lists.includes(listId)) await userdata.put({ ...base, lists: [...lists, listId] });
     }
     await caches.put(summary);
     touched.set(summary.code, det);
@@ -183,7 +195,7 @@ export async function deleteExportedFieldNotes(): Promise<number> {
 /* ---------- Eigene Daten (Notiz, korrigierte Koordinaten, eigene Wegpunkte) ---------- */
 
 function emptyUserData(code: string): UserData {
-  return { code, note: '', corrected: null, original: null, ownWaypoints: [] };
+  return { code, note: '', corrected: null, original: null, ownWaypoints: [], lists: [] };
 }
 
 export async function getUserData(code: string): Promise<UserData> {
@@ -252,17 +264,19 @@ export interface Backup {
   details: CacheDetails[];
   fieldnotes: FieldNote[];
   userdata: UserData[];
+  lists?: CacheListInfo[];
 }
 
 export async function createBackup(): Promise<Backup> {
   const d = await db();
-  const [caches, details, fieldnotes, userdata] = await Promise.all([
+  const [caches, details, fieldnotes, userdata, lists] = await Promise.all([
     d.getAll('caches'),
     d.getAll('details'),
     d.getAll('fieldnotes'),
     d.getAll('userdata'),
+    d.getAll('lists'),
   ]);
-  return { app: 'dosenfinder', version: 1, exportedAt: new Date().toISOString(), caches, details, fieldnotes, userdata };
+  return { app: 'dosenfinder', version: 1, exportedAt: new Date().toISOString(), caches, details, fieldnotes, userdata, lists };
 }
 
 export class BackupError extends Error {}
@@ -274,11 +288,94 @@ export async function restoreBackup(b: unknown): Promise<{ caches: number; field
     throw new BackupError('Das ist keine Dosenfinder-Sicherung.');
   }
   const d = await db();
-  const tx = d.transaction(['caches', 'details', 'fieldnotes', 'userdata'], 'readwrite');
+  const tx = d.transaction(['caches', 'details', 'fieldnotes', 'userdata', 'lists'], 'readwrite');
   for (const c of data.caches) await tx.objectStore('caches').put(c);
+  for (const x of data.lists ?? []) await tx.objectStore('lists').put(x);
   for (const x of data.details ?? []) await tx.objectStore('details').put(x);
   for (const x of data.fieldnotes ?? []) await tx.objectStore('fieldnotes').put(x);
   for (const x of data.userdata ?? []) await tx.objectStore('userdata').put(x);
   await tx.done;
   return { caches: data.caches.length, fieldnotes: data.fieldnotes?.length ?? 0, userdata: data.userdata?.length ?? 0 };
+}
+
+/* ---------- Gefunden von Hand ---------- */
+
+export async function setFound(code: string, found: boolean): Promise<void> {
+  const d = await db();
+  const tx = d.transaction('caches', 'readwrite');
+  const c = await tx.store.get(code);
+  if (c) await tx.store.put({ ...c, found });
+  await tx.done;
+}
+
+/* ---------- Eigene Listen ---------- */
+
+export async function getLists(): Promise<CacheListInfo[]> {
+  const lists = await (await db()).getAll('lists');
+  return lists.sort((a, b) => a.name.localeCompare(b.name, 'de'));
+}
+
+export async function createList(name: string): Promise<CacheListInfo> {
+  const list: CacheListInfo = { id: `L${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name: name.trim() || 'Neue Liste', createdAt: Date.now() };
+  await (await db()).put('lists', list);
+  return list;
+}
+
+export async function renameList(id: string, name: string): Promise<void> {
+  const d = await db();
+  const l = await d.get('lists', id);
+  if (l) await d.put('lists', { ...l, name: name.trim() || l.name });
+}
+
+/** Löscht die Liste. Die Caches selbst bleiben erhalten. */
+export async function deleteList(id: string): Promise<void> {
+  const d = await db();
+  const tx = d.transaction(['lists', 'userdata'], 'readwrite');
+  await tx.objectStore('lists').delete(id);
+  for (const u of await tx.objectStore('userdata').getAll()) {
+    if (u.lists?.includes(id)) await tx.objectStore('userdata').put({ ...u, lists: u.lists.filter((x) => x !== id) });
+  }
+  await tx.done;
+}
+
+/** Zuordnung Cache-Code → Listen-IDs */
+export async function getMemberships(): Promise<Map<string, string[]>> {
+  const all = await (await db()).getAll('userdata');
+  return new Map(all.filter((u) => u.lists?.length).map((u) => [u.code, u.lists!]));
+}
+
+export async function addToList(codes: string[], listId: string): Promise<void> {
+  const d = await db();
+  const tx = d.transaction('userdata', 'readwrite');
+  for (const code of codes) {
+    const u = (await tx.store.get(code)) ?? emptyUserData(code);
+    const lists = u.lists ?? [];
+    if (!lists.includes(listId)) await tx.store.put({ ...u, lists: [...lists, listId] });
+  }
+  await tx.done;
+}
+
+export async function removeFromList(codes: string[], listId: string): Promise<void> {
+  const d = await db();
+  const tx = d.transaction('userdata', 'readwrite');
+  for (const code of codes) {
+    const u = await tx.store.get(code);
+    if (u?.lists?.includes(listId)) await tx.store.put({ ...u, lists: u.lists.filter((x) => x !== listId) });
+  }
+  await tx.done;
+}
+
+export async function setCacheLists(code: string, listIds: string[]): Promise<void> {
+  await updateUserData(code, (u) => ({ ...u, lists: listIds }));
+}
+
+/** Entfernt Caches aus der App. Field Notes und eigene Daten bleiben erhalten. */
+export async function deleteCaches(codes: string[]): Promise<void> {
+  const d = await db();
+  const tx = d.transaction(['caches', 'details'], 'readwrite');
+  for (const code of codes) {
+    await tx.objectStore('caches').delete(code);
+    await tx.objectStore('details').delete(code);
+  }
+  await tx.done;
 }
