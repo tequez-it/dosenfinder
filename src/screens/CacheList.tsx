@@ -8,20 +8,32 @@ import { TypeIcon } from '../components/TypeIcon';
 import { FilterPanel } from '../components/FilterPanel';
 import type { CacheSummary, CacheType } from '../types';
 import { hashFor } from '../routes';
+import { compareBy, loadSort, matchesSearch, saveSort, SORT_LABELS, type SortKey } from '../sort';
 
 interface Props {
   onBack: () => void;
   onImport: () => void;
 }
 
-/** Scrollposition merken, damit "Details → Zurück" an derselben Stelle der Liste landet */
+/** Scrollposition und Suche merken, damit "Details → Zurück" an derselben Stelle der Liste landet */
 let savedScroll = 0;
+let savedQuery = '';
 
 export function CacheList({ onBack, onImport }: Props) {
   const [caches, setCaches] = useState<CacheSummary[] | null>(null);
   const [filters, setFilters] = useState<Filters>(loadFilters);
   const [showFilters, setShowFilters] = useState(false);
+  const [query, setQueryState] = useState(savedQuery);
+  const [sort, setSortState] = useState<SortKey>(loadSort);
   const position = usePosition();
+  const setQuery = (q: string) => {
+    savedQuery = q;
+    setQueryState(q);
+  };
+  const setSort = (k: SortKey) => {
+    saveSort(k);
+    setSortState(k);
+  };
 
   useEffect(() => {
     getAllSummaries().then(setCaches).catch(() => setCaches([]));
@@ -51,16 +63,15 @@ export function CacheList({ onBack, onImport }: Props) {
 
   const rows = useMemo(() => {
     if (!caches) return [];
-    const filtered = caches.filter((c) => matches(c, filters));
+    const filtered = caches.filter((c) => matches(c, filters) && matchesSearch(c, query));
     const withDist = filtered.map((c) => ({
       cache: c,
       dist: pos ? distance(pos, c) : null,
       dir: pos ? cardinal(bearing(pos, c)) : '',
     }));
-    if (pos) withDist.sort((a, b) => a.dist! - b.dist!);
-    else withDist.sort((a, b) => a.cache.name.localeCompare(b.cache.name, 'de'));
+    withDist.sort(compareBy(sort));
     return withDist;
-  }, [caches, filters, posKey]);
+  }, [caches, filters, posKey, query, sort]);
 
   const total = caches?.length ?? 0;
   const subtitle = caches === null ? 'Lade …' : rows.length === total ? `${total} Caches` : `${rows.length} von ${total} Caches`;
@@ -72,6 +83,7 @@ export function CacheList({ onBack, onImport }: Props) {
         subtitle={subtitle}
         onBack={() => {
           savedScroll = 0;
+          savedQuery = '';
           onBack();
         }}
         actions={
@@ -92,6 +104,24 @@ export function CacheList({ onBack, onImport }: Props) {
 
       {showFilters && <FilterPanel filters={filters} availableTypes={availableTypes} onChange={updateFilters} />}
 
+      {total > 0 && (
+        <div class="list-tools">
+          <input
+            class="field search"
+            type="search"
+            placeholder="Suche: Name, Code, Owner"
+            value={query}
+            onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
+            aria-label="Caches durchsuchen"
+          />
+          <select value={sort} onChange={(e) => setSort((e.target as HTMLSelectElement).value as SortKey)} aria-label="Sortierung">
+            {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
+              <option value={k}>{SORT_LABELS[k]}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <PositionHint state={position.status} />
 
       {caches !== null && total === 0 && (
@@ -103,7 +133,7 @@ export function CacheList({ onBack, onImport }: Props) {
 
       {total > 0 && rows.length === 0 && (
         <div class="empty">
-          <p>Kein Cache passt zum Filter.</p>
+          <p>{query ? `Kein Cache passt zu „${query}“.` : 'Kein Cache passt zum Filter.'}</p>
         </div>
       )}
 
@@ -142,9 +172,9 @@ function PositionHint({ state }: { state: string }) {
   if (state === 'ok') return null;
   const text: Record<string, string> = {
     pending: 'Suche GPS-Position …',
-    denied: 'Kein Standortzugriff – Liste nach Name sortiert. Freigabe am iPhone: Einstellungen → Datenschutz & Sicherheit → Ortungsdienste → Safari-Websites.',
-    unsupported: 'Dieses Gerät liefert keinen Standort – Liste nach Name sortiert.',
-    error: 'GPS-Position nicht verfügbar – Liste nach Name sortiert.',
+    denied: 'Kein Standortzugriff – keine Entfernungen. Freigabe am iPhone: Einstellungen → Datenschutz & Sicherheit → Ortungsdienste → Safari-Websites.',
+    unsupported: 'Dieses Gerät liefert keinen Standort – keine Entfernungen.',
+    error: 'GPS-Position nicht verfügbar – keine Entfernungen.',
   };
   return <div class="position-hint">{text[state]}</div>;
 }

@@ -3,9 +3,9 @@
 Web-App (PWA) fürs iPhone, um Geocaches aus GPX-Dateien und Pocket Queries offline zu finden.
 Bedienung und Look angelehnt an c:geo. Alle Daten bleiben auf dem Gerät – es gibt keinen Server und keinen Login.
 
-**Stand 0.4.0:** Import (GPX / Pocket-Query-ZIP inkl. Wegpunkte), Cache-Liste nach Entfernung, Filter (Typ, D/T, gefunden),
-Cache-Details (Infos, Attribute, Hinweis, Beschreibung, Wegpunkte, Logs), Navigation mit Kompass zu Cache oder Wegpunkt,
-Karte mit Cache-Symbolen (OpenStreetMap, nur online), Field Notes (offline loggen, Export als geocache_visits.txt).
+**Stand 0.5.0:** Import (GPX / Pocket-Query-ZIP inkl. Wegpunkte), Cache-Liste nach Entfernung, Filter (Typ, D/T, gefunden),
+Cache-Details mit Reitern wie c:geo (Details, Beschreibung, Logbuch, Wegpunkte), Suche und Sortierung in der Liste, Navigation mit Kompass zu Cache oder Wegpunkt,
+Karte mit Cache-Symbolen, Ziel-Linie und Wegpunkten (OpenStreetMap, nur online), Field Notes (offline loggen, Export als geocache_visits.txt).
 
 ## Nutzung auf dem iPhone
 
@@ -37,6 +37,7 @@ src/
   compass.ts  Winkelrechnung für den Pfeil
   sanitize.ts Bereinigung fremder HTML-Beschreibungen (DOMPurify)
   routes.ts   Hash-Routing
+  sort.ts     Suche und Sortierung der Liste
   fieldnotes.ts Field Notes: Logtypen und Dateiformat für geocaching.com
 testdata/     selbst erstellte, erfundene Testdaten
 ```

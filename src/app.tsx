@@ -39,9 +39,10 @@ function back(fallback: Route) {
 
 // Die Karte (MapLibre, ~1 MB) erst laden, wenn sie gebraucht wird
 type MapProps = {
+  target?: { code: string; waypoint?: string };
   onBack: () => void;
   onDetails: (code: string) => void;
-  onNavigate: (code: string) => void;
+  onNavigate: (code: string, waypoint?: string) => void;
   onImport: () => void;
 };
 let MapScreenCache: ComponentType<MapProps> | null = null;
@@ -86,9 +87,11 @@ export function App() {
     case 'map':
       return (
         <LazyMap
-          onBack={() => back({ name: 'home' })}
+          key={`${route.code ?? ''}/${route.waypoint ?? ''}`}
+          target={route.code ? { code: route.code, waypoint: route.waypoint } : undefined}
+          onBack={() => back(route.code ? { name: 'cache', code: route.code } : { name: 'home' })}
           onDetails={(code) => go({ name: 'cache', code })}
-          onNavigate={(code) => go({ name: 'nav', code })}
+          onNavigate={(code, waypoint) => go({ name: 'nav', code, waypoint })}
           onImport={() => go({ name: 'import' })}
         />
       );
@@ -106,6 +109,7 @@ export function App() {
           onBack={() => back({ name: 'list' })}
           onNavigate={(waypoint) => go({ name: 'nav', code: route.code, waypoint })}
           onLog={() => go({ name: 'log', code: route.code })}
+          onShowMap={(waypoint) => go({ name: 'map', code: route.code, waypoint })}
         />
       );
     case 'nav':
@@ -115,6 +119,7 @@ export function App() {
           code={route.code}
           waypoint={route.waypoint}
           onBack={() => back({ name: 'cache', code: route.code })}
+          onShowMap={() => go({ name: 'map', code: route.code, waypoint: route.waypoint })}
         />
       );
     default:

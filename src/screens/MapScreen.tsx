@@ -4,8 +4,9 @@ import type { GeoJSONSource, Map as MLMap, MapMouseEvent, PointLike } from 'mapl
 import type { FeatureCollection } from 'geojson';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { getAllSummaries } from '../db';
-import { distance, formatDistance, formatRating } from '../geo';
+import { getAllSummaries, getDetails } from '../db';
+import { bearing, cardinal, distance, formatDistance, formatRating } from '../geo';
+import { formatCoords } from '../format';
 import { isDefault, loadFilters, matches, saveFilters, type Filters } from '../filters';
 import { usePosition } from '../hooks/usePosition';
 import { Header } from '../components/Header';
@@ -13,15 +14,27 @@ import { TypeIcon, TYPE_STYLE } from '../components/TypeIcon';
 import { FilterPanel } from '../components/FilterPanel';
 import { createIcon, iconName, ICON_SIZE } from '../map/icons';
 import { getLastView, OSM_STYLE, setLastView } from '../map/mapView';
-import { CACHE_TYPE_LABELS, type CacheSummary, type CacheType } from '../types';
+import { CACHE_TYPE_LABELS, type CacheSummary, type CacheType, type Waypoint } from '../types';
 
 maplibregl.setWorkerUrl(workerUrl);
 
 interface Props {
+  /** Ziel: Karte darauf ausrichten und Linie vom eigenen Standort zeichnen */
+  target?: { code: string; waypoint?: string };
   onBack: () => void;
   onDetails: (code: string) => void;
-  onNavigate: (code: string) => void;
+  onNavigate: (code: string, waypoint?: string) => void;
   onImport: () => void;
+}
+
+interface TargetPoint {
+  lat: number;
+  lon: number;
+  title: string;
+}
+
+function point(lon: number, lat: number): FeatureCollection {
+  return { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [lon, lat] }, properties: {} }] };
 }
 
 /** Ab dieser Zoomstufe Symbole statt Punkte */
@@ -48,14 +61,16 @@ function cachesToGeoJSON(caches: CacheSummary[]): FeatureCollection {
   };
 }
 
-export function MapScreen({ onBack, onDetails, onNavigate, onImport }: Props) {
+export function MapScreen({ target, onBack, onDetails, onNavigate, onImport }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [caches, setCaches] = useState<CacheSummary[] | null>(null);
   const [filters, setFilters] = useState<Filters>(loadFilters);
   const [showFilters, setShowFilters] = useState(false);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(target?.code ?? null);
+  const [selectedWp, setSelectedWp] = useState<string | null>(target?.waypoint ?? null);
+  const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
   const [online, setOnline] = useState(navigator.onLine);
   const position = usePosition();
   const pos = position.status === 'ok' ? position.pos : null;
@@ -81,7 +96,7 @@ export function MapScreen({ onBack, onDetails, onNavigate, onImport }: Props) {
   // Karte einmalig anlegen
   useEffect(() => {
     if (!container.current) return;
-    const last = getLastView();
+    const last = target ? null : getLastView();
     const map = new maplibregl.Map({
       container: container.current,
       style: OSM_STYLE,
@@ -134,6 +149,30 @@ export function MapScreen({ onBack, onDetails, onNavigate, onImport }: Props) {
         paint: { 'icon-opacity': ['case', ['get', 'dimmed'], 0.5, 1] },
       });
 
+      // Linie vom eigenen Standort zum Ziel
+      map.addSource('line', { type: 'geojson', data: EMPTY });
+      map.addLayer({
+        id: 'line',
+        type: 'line',
+        source: 'line',
+        layout: { 'line-cap': 'round' },
+        paint: { 'line-color': '#e5484d', 'line-width': 3, 'line-dasharray': [2, 1.5] },
+      });
+
+      // Wegpunkte des gewählten Caches
+      map.addSource('waypoints', { type: 'geojson', data: EMPTY });
+      map.addLayer({
+        id: 'waypoints',
+        type: 'circle',
+        source: 'waypoints',
+        paint: {
+          'circle-radius': 7,
+          'circle-color': ['case', ['get', 'selected'], '#f39200', '#6a5acd'],
+          'circle-stroke-color': '#fff',
+          'circle-stroke-width': 2,
+        },
+      });
+
       map.addSource('selected', { type: 'geojson', data: EMPTY });
       map.addLayer({
         id: 'selected',
@@ -166,7 +205,13 @@ export function MapScreen({ onBack, onDetails, onNavigate, onImport }: Props) {
           [e.point.x - 12, e.point.y - 12],
           [e.point.x + 12, e.point.y + 12],
         ];
+        const wp = map.queryRenderedFeatures(box, { layers: ['waypoints'] })[0];
+        if (wp) {
+          setSelectedWp(wp.properties.code as string);
+          return;
+        }
         const hit = map.queryRenderedFeatures(box, { layers: ['caches', 'caches-dots'] })[0];
+        setSelectedWp(null);
         setSelected(hit ? (hit.properties.code as string) : null);
       });
 
@@ -191,8 +236,8 @@ export function MapScreen({ onBack, onDetails, onNavigate, onImport }: Props) {
     (map.getSource('caches') as GeoJSONSource).setData(cachesToGeoJSON(visible));
   }, [mapReady, visible, caches]);
 
-  // Beim ersten Öffnen auf alle Caches zoomen
-  const fitted = useRef(getLastView() !== null);
+  // Beim ersten Öffnen auf alle Caches zoomen (ohne Ziel)
+  const fitted = useRef(!!target || getLastView() !== null);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady || fitted.current || visible.length === 0) return;
@@ -207,22 +252,84 @@ export function MapScreen({ onBack, onDetails, onNavigate, onImport }: Props) {
     const map = mapRef.current;
     if (!map || !mapReady) return;
     (map.getSource('me') as GeoJSONSource).setData(
-      pos
-        ? { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [pos.lon, pos.lat] }, properties: {} }] }
-        : EMPTY,
+      pos ? point(pos.lon, pos.lat) : EMPTY,
     );
   }, [mapReady, pos?.lat, pos?.lon]);
 
-  const selectedCache = selected ? visible.find((c) => c.code === selected) ?? null : null;
+  // Gewählter Cache auch dann, wenn ihn der Filter gerade ausblendet (z. B. Ziel aus der Navigation)
+  const selectedCache = selected ? (caches ?? []).find((c) => c.code === selected) ?? null : null;
+  const targetCache = target ? (caches ?? []).find((c) => c.code === target.code) ?? null : null;
+  const targetWp = target?.waypoint ? waypoints.find((w) => w.code === target.waypoint) : undefined;
+  const targetPoint: TargetPoint | null = targetWp && targetWp.lat !== null && targetWp.lon !== null
+    ? { lat: targetWp.lat, lon: targetWp.lon, title: targetWp.name }
+    : targetCache && !target?.waypoint
+      ? { lat: targetCache.lat, lon: targetCache.lon, title: targetCache.name }
+      : null;
+  const activeWp = selectedWp ? waypoints.find((w) => w.code === selectedWp) ?? null : null;
+
+  // Wegpunkte des gewählten Caches laden
+  useEffect(() => {
+    if (!selected) {
+      setWaypoints([]);
+      return;
+    }
+    getDetails(selected)
+      .then((d) => setWaypoints(d?.waypoints ?? []))
+      .catch(() => setWaypoints([]));
+  }, [selected]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    (map.getSource('waypoints') as GeoJSONSource).setData({
+      type: 'FeatureCollection',
+      features: waypoints
+        .filter((w) => w.lat !== null && w.lon !== null)
+        .map((w) => ({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [w.lon!, w.lat!] },
+          properties: { code: w.code, selected: w.code === selectedWp },
+        })),
+    });
+  }, [mapReady, waypoints, selectedWp]);
+
+  // Beim Öffnen mit Ziel: Ziel und eigenen Standort ins Bild holen
+  const centered = useRef(false);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady || !targetPoint || centered.current) return;
+    centered.current = true;
+    if (pos && distance(pos, targetPoint) < 20000) {
+      const b = new maplibregl.LngLatBounds([pos.lon, pos.lat], [pos.lon, pos.lat]);
+      b.extend([targetPoint.lon, targetPoint.lat]);
+      map.fitBounds(b, { padding: 80, maxZoom: 17, duration: 0 });
+    } else {
+      map.jumpTo({ center: [targetPoint.lon, targetPoint.lat], zoom: 16 });
+    }
+  }, [mapReady, targetPoint?.lat, targetPoint?.lon, !!pos]);
+
+  // Linie zum Ziel
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    (map.getSource('line') as GeoJSONSource).setData(
+      pos && targetPoint
+        ? {
+            type: 'FeatureCollection',
+            features: [
+              { type: 'Feature', geometry: { type: 'LineString', coordinates: [[pos.lon, pos.lat], [targetPoint.lon, targetPoint.lat]] }, properties: {} },
+            ],
+          }
+        : EMPTY,
+    );
+  }, [mapReady, pos?.lat, pos?.lon, targetPoint?.lat, targetPoint?.lon]);
 
   // Auswahl-Ring
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady) return;
     (map.getSource('selected') as GeoJSONSource).setData(
-      selectedCache
-        ? { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [selectedCache.lon, selectedCache.lat] }, properties: {} }] }
-        : EMPTY,
+      selectedCache ? point(selectedCache.lon, selectedCache.lat) : EMPTY,
     );
   }, [mapReady, selectedCache]);
 
@@ -243,8 +350,8 @@ export function MapScreen({ onBack, onDetails, onNavigate, onImport }: Props) {
   return (
     <div class="screen map-screen">
       <Header
-        title="Karte"
-        subtitle={subtitle}
+        title={target ? 'Karte – Ziel' : 'Karte'}
+        subtitle={targetPoint ? targetPoint.title : subtitle}
         onBack={onBack}
         actions={
           total > 0 && (
@@ -271,6 +378,12 @@ export function MapScreen({ onBack, onDetails, onNavigate, onImport }: Props) {
           </div>
         )}
 
+        {targetPoint && pos && !showFilters && (
+          <div class="map-banner map-target">
+            Ziel: <b>{formatDistance(distance(pos, targetPoint))}</b> {cardinal(bearing(pos, targetPoint))}
+          </div>
+        )}
+
         {!online && <div class="map-banner">Offline – Kartenbilder werden nicht geladen. Caches bleiben sichtbar.</div>}
 
         {caches !== null && total === 0 && (
@@ -288,7 +401,31 @@ export function MapScreen({ onBack, onDetails, onNavigate, onImport }: Props) {
           </svg>
         </button>
 
-        {selectedCache && (
+        {activeWp && selectedCache && (
+          <div class="map-sheet">
+            <div class="map-sheet-head">
+              <div class="wp-dot" />
+              <div class="cache-main">
+                <div class="cache-name">{activeWp.name}</div>
+                <div class="cache-meta">
+                  {activeWp.type} · {selectedCache.name}
+                </div>
+                {activeWp.lat !== null && activeWp.lon !== null && (
+                  <div class="cache-meta">{formatCoords(activeWp.lat, activeWp.lon)}</div>
+                )}
+              </div>
+              {pos && activeWp.lat !== null && activeWp.lon !== null && (
+                <div class="cache-dist">{formatDistance(distance(pos, { lat: activeWp.lat, lon: activeWp.lon }))}</div>
+              )}
+            </div>
+            <div class="map-sheet-actions">
+              <button class="secondary-btn" onClick={() => onDetails(selectedCache.code)}>Cache</button>
+              <button class="primary-btn" onClick={() => onNavigate(selectedCache.code, activeWp.code)}>Navigieren</button>
+            </div>
+          </div>
+        )}
+
+        {selectedCache && !activeWp && (
           <div class="map-sheet">
             <div class="map-sheet-head">
               <TypeIcon type={selectedCache.type} found={selectedCache.found} dimmed={!selectedCache.available || selectedCache.archived} />
