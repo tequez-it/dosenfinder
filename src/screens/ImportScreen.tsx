@@ -171,7 +171,7 @@ function BackupSection() {
     try {
       const b = await createBackup();
       const date = b.exportedAt.slice(0, 10);
-      const r = await shareOrDownload(JSON.stringify(b), `dosenfinder-sicherung-${date}.json`, 'application/json', 'Dosenfinder-Sicherung');
+      const r = await shareOrDownload(JSON.stringify(b), `dosenfinder-sicherung-${date}.json`, 'application/json');
       if (r !== 'cancelled') {
         setMsg({ ok: true, text: `Sicherung erstellt: ${b.caches.length} Caches, ${b.fieldnotes.length} Field Notes, ${b.userdata.length} Caches mit eigenen Daten.` });
       }

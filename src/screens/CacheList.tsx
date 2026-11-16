@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { addToList, deleteCaches, getAllSummaries, removeFromList } from '../db';
+import { addToList, deleteCaches, getAllSummaries, getDetails, getSummary, getUserData, removeFromList } from '../db';
+import { buildGpx } from '../gpx/export';
+import { shareOrDownload } from '../share';
 import { useLists } from '../hooks/useLists';
 import { ListPicker } from '../components/ListPicker';
 import { bearing, cardinal, distance, formatDistance, formatRating } from '../geo';
@@ -228,6 +230,7 @@ function BulkActions(props: {
   const { codes, listsState, onClose, onDone } = props;
   const [target, setTarget] = useState(listsState.lists[0]?.id ?? '');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const activeList = listsState.lists.find((l) => l.id === listsState.active);
   const n = codes.length;
 
@@ -259,6 +262,28 @@ function BulkActions(props: {
             Noch keine eigenen Listen. <a href={hashFor({ name: 'lists' })}>Liste anlegen</a>
           </p>
         )}
+
+        <button
+          class="secondary-btn"
+          disabled={n === 0 || exporting}
+          onClick={async () => {
+            setExporting(true);
+            try {
+              const items = [];
+              for (const code of codes) {
+                const [summary, details, user] = await Promise.all([getSummary(code), getDetails(code), getUserData(code)]);
+                if (summary) items.push({ summary, details, ownWaypoints: user.ownWaypoints });
+              }
+              const date = new Date().toISOString().slice(0, 10);
+              await shareOrDownload(buildGpx(items), `dosenfinder-${date}.gpx`, 'application/gpx+xml');
+              onClose();
+            } finally {
+              setExporting(false);
+            }
+          }}
+        >
+          {exporting ? 'Exportiere …' : 'Als GPX exportieren'}
+        </button>
 
         {activeList && (
           <button

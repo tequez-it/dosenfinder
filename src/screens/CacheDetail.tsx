@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { deleteOwnWaypoint, getDetails, getFieldNote, getLists, getSummary, getUserData, saveNote, saveOwnWaypoint, setCacheLists, setCorrectedCoords, setFound } from '../db';
 import { attributeName } from '../attributes';
 import { CoordsEditor } from '../components/CoordsEditor';
+import { VariablesTab } from './VariablesTab';
+import { findCheckers, findCoordsInText, htmlToText } from '../tools';
 import { FIELD_NOTE_TYPES, type FieldNote } from '../fieldnotes';
 import { bearing, cardinal, distance, formatDistance, formatRating, type LatLon } from '../geo';
 import { formatCoords, formatDate, rot13 } from '../format';
@@ -21,7 +23,7 @@ interface Props {
   onShowMap: (waypoint?: string) => void;
 }
 
-type Tab = 'details' | 'description' | 'logs' | 'waypoints';
+type Tab = 'details' | 'description' | 'logs' | 'waypoints' | 'variables';
 
 type Loaded = { summary: CacheSummary; details: CacheDetails | undefined; note: FieldNote | undefined; user: UserData } | null | 'missing';
 
@@ -32,6 +34,12 @@ export function CacheDetail({ code, onBack, onNavigate, onLog, onShowMap }: Prop
   const [data, setData] = useState<Loaded>(null);
   const [tab, setTabState] = useState<Tab>(() => (lastTab?.code === code ? lastTab.tab : 'details'));
   const touch = useRef<{ x: number; y: number } | null>(null);
+  const tabsRef = useRef<HTMLElement>(null);
+  // Gewählten Reiter sichtbar halten, wenn die Leiste breiter als der Bildschirm ist
+  useEffect(() => {
+    const el = tabsRef.current?.querySelector<HTMLElement>(`[data-tab="${tab}"]`);
+    el?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [tab, data]);
   const setTab = (t: Tab) => {
     lastTab = { code, tab: t };
     setTabState(t);
@@ -67,6 +75,7 @@ export function CacheDetail({ code, onBack, onNavigate, onLog, onShowMap }: Prop
     { id: 'description', label: 'Beschreibung' },
     { id: 'logs', label: `Logbuch${d?.logs.length ? ` (${d.logs.length})` : ''}` },
     { id: 'waypoints', label: `Wegpunkte${allWaypoints.length ? ` (${allWaypoints.length})` : ''}` },
+    { id: 'variables', label: `Variablen${Object.keys(user.variables ?? {}).length ? ` (${Object.keys(user.variables ?? {}).length})` : ''}` },
   ];
 
   // Wischen nach links/rechts wechselt den Reiter – wie in c:geo
@@ -105,9 +114,9 @@ export function CacheDetail({ code, onBack, onNavigate, onLog, onShowMap }: Prop
         }
       />
 
-      <nav class="tabs" role="tablist">
+      <nav class="tabs" role="tablist" ref={tabsRef}>
         {tabs.map((t) => (
-          <button role="tab" aria-selected={tab === t.id} class={tab === t.id ? 'tab-on' : ''} onClick={() => setTab(t.id)}>
+          <button role="tab" aria-selected={tab === t.id} class={tab === t.id ? 'tab-on' : ''} data-tab={t.id} onClick={() => setTab(t.id)}>
             {t.label}
           </button>
         ))}
@@ -119,8 +128,9 @@ export function CacheDetail({ code, onBack, onNavigate, onLog, onShowMap }: Prop
         )}
         {tab === 'description' && <DescriptionTab d={d} />}
         {tab === 'logs' && <LogsTab d={d} />}
+        {tab === 'variables' && <VariablesTab c={c} user={user} pos={pos} onChanged={reload} onNavigate={onNavigate} />}
         {tab === 'waypoints' && (
-          <WaypointsTab c={c} waypoints={allWaypoints} pos={pos} onNavigate={onNavigate} onShowMap={onShowMap} onChanged={reload} />
+          <WaypointsTab c={c} d={d} waypoints={allWaypoints} pos={pos} onNavigate={onNavigate} onShowMap={onShowMap} onChanged={reload} />
         )}
       </div>
     </div>
@@ -207,6 +217,8 @@ function DetailsTab(props: {
         <button class="primary-btn" onClick={() => onNavigate()}>Navigieren</button>
         <button class="secondary-btn" onClick={onLog}>{note ? 'Field Note ändern' : 'Loggen'}</button>
       </div>
+      <CheckerLinks c={c} d={d} user={user} />
+
       <div class="content detail-actions detail-actions-2">
         <button class="secondary-btn" onClick={() => onShowMap()}>Auf Karte zeigen</button>
         <a class="secondary-btn" href={appleMapsUrl(c.lat, c.lon, c.name)} target="_blank" rel="noopener">
@@ -256,6 +268,29 @@ function DetailsTab(props: {
 
       {d?.hint && <HintBox hint={d.hint} />}
     </>
+  );
+}
+
+/** Lösungsprüfer aus dem Listing (wie c:geo): mit der eigenen Lösung als Koordinate */
+function CheckerLinks({ c, d, user }: { c: CacheSummary; d: CacheDetails | undefined; user: UserData }) {
+  const checkers = useMemo(() => {
+    if (!d) return [];
+    const final = c.corrected
+      ? { lat: c.lat, lon: c.lon }
+      : user.ownWaypoints.find((w) => w.lat !== null && w.lon !== null && (w.calc || /final/i.test(w.name)));
+    const coord = final && final.lat !== null && final.lon !== null ? { lat: final.lat, lon: final.lon } : null;
+    return findCheckers(`${d.shortDescription} ${d.longDescription}`, d.url, d.attributes, coord);
+  }, [c, d, user]);
+  if (!checkers.length) return null;
+  return (
+    <div class="content checkers">
+      {checkers.map((k) => (
+        <a class="secondary-btn" href={k.url} target="_blank" rel="noopener noreferrer">
+          Lösung prüfen: {k.name}
+          {k.withCoords && <span class="muted"> (mit deiner Koordinate)</span>}
+        </a>
+      ))}
+    </div>
   );
 }
 
@@ -391,13 +426,40 @@ function LogsTab({ d }: { d: CacheDetails | undefined }) {
 
 function WaypointsTab(props: {
   c: CacheSummary;
+  d: CacheDetails | undefined;
   waypoints: Waypoint[];
   pos: LatLon | null;
   onNavigate: (wp?: string) => void;
   onShowMap: (wp?: string) => void;
   onChanged: () => void;
 }) {
-  const { c, waypoints, pos, onNavigate, onShowMap, onChanged } = props;
+  const { c, d, waypoints, pos, onNavigate, onShowMap, onChanged } = props;
+  // Koordinaten aus Beschreibung und Hinweis, die noch kein Wegpunkt sind (wie c:geo "Wegpunkte extrahieren")
+  const found = useMemo(() => {
+    if (!d) return [];
+    const text = [
+      d.shortDescriptionHtml ? htmlToText(d.shortDescription) : d.shortDescription,
+      d.longDescriptionHtml ? htmlToText(d.longDescription) : d.longDescription,
+      d.hint,
+    ].join('\n');
+    const known = [{ lat: c.lat, lon: c.lon }, ...waypoints.filter((w) => w.lat !== null && w.lon !== null).map((w) => ({ lat: w.lat!, lon: w.lon! }))];
+    return findCoordsInText(text).filter((p) => !known.some((k) => distance(k, p) < 2));
+  }, [d, waypoints, c.lat, c.lon]);
+  const adopt = async (list: typeof found) => {
+    let n = waypoints.filter((w) => w.own).length;
+    for (const p of list) {
+      n++;
+      await saveOwnWaypoint(c.code, {
+        code: `EIGEN${Date.now().toString(36).toUpperCase()}${n}`,
+        name: `Aus Beschreibung ${n}`,
+        type: 'Eigener Wegpunkt',
+        lat: p.lat,
+        lon: p.lon,
+        comment: p.text,
+      });
+    }
+    onChanged();
+  };
   // null = kein Formular, 'new' = neuer Wegpunkt, sonst Code des bearbeiteten
   const [editing, setEditing] = useState<string | null>(null);
   const [name, setName] = useState('');
@@ -446,6 +508,20 @@ function WaypointsTab(props: {
   return (
     <section class="section section-first">
       <button class="secondary-btn add-wp" onClick={() => startEdit()}>+ Wegpunkt hinzufügen</button>
+      {found.length > 0 && (
+        <div class="found-coords">
+          <div class="found-coords-head">
+            <span>In der Beschreibung gefunden ({found.length})</span>
+            {found.length > 1 && <button class="text-btn" onClick={() => adopt(found)}>Alle übernehmen</button>}
+          </div>
+          {found.map((p) => (
+            <div class="found-coord">
+              <span>{formatCoords(p.lat, p.lon)}</span>
+              <button class="text-btn" onClick={() => adopt([p])}>Übernehmen</button>
+            </div>
+          ))}
+        </div>
+      )}
       {waypoints.length === 0 && <div class="empty">Keine Wegpunkte.</div>}
       <ul class="waypoints">
         {waypoints.map((w) => {
@@ -455,7 +531,7 @@ function WaypointsTab(props: {
               <div class="wp-main">
                 <div class="wp-name">{w.name}</div>
                 <div class="wp-meta">
-                  {w.own ? 'Eigener Wegpunkt' : `${w.code} · ${w.type}`}
+                  {w.own ? (w.calc ? 'Berechneter Wegpunkt' : 'Eigener Wegpunkt') : `${w.code} · ${w.type}`}
                   {has && pos ? ` · ${formatDistance(distance(pos, { lat: w.lat!, lon: w.lon! }))}` : ''}
                 </div>
                 <div class="wp-meta">{has ? formatCoords(w.lat!, w.lon!) : 'Keine Koordinaten'}</div>

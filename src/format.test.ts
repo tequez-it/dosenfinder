@@ -60,6 +60,9 @@ describe('Routing', () => {
     expect(hashFor({ name: 'map' })).toBe('#/karte');
     expect(parseHash('#/fieldnotes')).toEqual({ name: 'fieldnotes' });
     expect(parseHash('#/listen')).toEqual({ name: 'lists' });
+    expect(parseHash('#/gehezu')).toEqual({ name: 'goto' });
+    expect(parseHash('#/punkt/50.5/10.25')).toEqual({ name: 'point', lat: 50.5, lon: 10.25 });
+    expect(parseHash('#/punkt/x')).toEqual({ name: 'goto' });
     expect(hashFor({ name: 'lists' })).toBe('#/listen');
     expect(parseHash('#/log/GCTEST1')).toEqual({ name: 'log', code: 'GCTEST1' });
     expect(parseHash('#/cache/GCTEST1')).toEqual({ name: 'cache', code: 'GCTEST1' });

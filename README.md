@@ -3,11 +3,13 @@
 Web-App (PWA) fürs iPhone, um Geocaches aus GPX-Dateien und Pocket Queries offline zu finden.
 Bedienung und Look angelehnt an c:geo. Alle Daten bleiben auf dem Gerät – es gibt keinen Server und keinen Login.
 
-**Stand 0.7.0:** Import (GPX / Pocket-Query-ZIP inkl. Wegpunkte), Cache-Liste nach Entfernung, Filter (Typ, D/T, gefunden),
+**Stand 0.8.0:** Import (GPX / Pocket-Query-ZIP inkl. Wegpunkte), Cache-Liste nach Entfernung, Filter (Typ, D/T, gefunden),
 Cache-Details mit Reitern wie c:geo (Details, Beschreibung, Logbuch, Wegpunkte), Suche und Sortierung in der Liste, Navigation mit Kompass zu Cache oder Wegpunkt,
 Karte mit Cache-Symbolen, Ziel-Linie und Wegpunkten (OpenStreetMap, nur online), Field Notes (offline loggen, Export als geocache_visits.txt),
 persönliche Notiz, korrigierte Koordinaten, eigene Wegpunkte (auch per Projektion), Datensicherung als Datei, deutsche Attribut-Namen,
-eigene Listen (Import direkt in Liste, Sammelaktionen), Caches von Hand als gefunden markieren.
+eigene Listen (Import direkt in Liste, Sammelaktionen), Caches von Hand als gefunden markieren,
+Rätsel-Werkzeuge wie c:geo: Variablen, berechnete Koordinaten mit Formeln (Quersumme, BWW, ROT, römisch, Handy-Tastatur …),
+Koordinaten aus der Beschreibung übernehmen, Lösungsprüfer-Links, „Gehe zu“, GPX-Export.
 
 ## Nutzung auf dem iPhone
 
@@ -28,7 +30,7 @@ Technik: Vite, Preact, TypeScript, IndexedDB (`idb`), ZIP-Entpacken mit `fflate`
 
 ```
 src/
-  gpx/        GPX-Parser und Datei-Import (GPX + ZIP)
+  gpx/        GPX-Parser, Datei-Import (GPX + ZIP) und GPX-Export
   screens/    Startseite, Liste, Listen, Karte, Import, Details, Navigation, Field Notes
   map/        Karten-Symbole und Kartenstil
   components/ Kopfleiste, Typ-Symbole, Filter
@@ -42,6 +44,8 @@ src/
   sort.ts     Suche und Sortierung der Liste
   attributes.ts Deutsche Attribut-Namen
   share.ts    Datei teilen (iOS) oder herunterladen
+  formula/    Formel-Rechner und berechnete Koordinaten (nach c:geo)
+  tools.ts    Koordinaten in Beschreibungen finden, Lösungsprüfer erkennen
   fieldnotes.ts Field Notes: Logtypen und Dateiformat für geocaching.com
 testdata/     selbst erstellte, erfundene Testdaten
 ```

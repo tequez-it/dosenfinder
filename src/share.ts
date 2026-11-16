@@ -1,11 +1,15 @@
 export type ShareResult = 'shared' | 'downloaded' | 'cancelled';
 
-/** iPhone: Teilen-Menü (z. B. „In Dateien sichern“). Sonst normaler Download. */
-export async function shareOrDownload(data: BlobPart, fileName: string, type: string, title: string): Promise<ShareResult> {
+/**
+ * iPhone: Teilen-Menü (z. B. „In Dateien sichern“). Sonst normaler Download.
+ * Bewusst ohne Titel/Text: iOS legt sonst beim Sichern eine zusätzliche Datei
+ * ("Text.txt") mit dem Titel an.
+ */
+export async function shareOrDownload(data: BlobPart, fileName: string, type: string): Promise<ShareResult> {
   const file = new File([data], fileName, { type });
   if (navigator.canShare?.({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], title });
+      await navigator.share({ files: [file] });
       return 'shared';
     } catch (e) {
       if ((e as DOMException).name === 'AbortError') return 'cancelled';

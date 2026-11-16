@@ -1,3 +1,4 @@
+import type { CalcCoordDef } from './formula/calcCoords';
 /** Cache-Typen, normalisiert aus den Bezeichnungen in GPX-Dateien. */
 export type CacheType =
   | 'traditional'
@@ -71,6 +72,8 @@ export interface Waypoint {
   comment: string;
   /** vom Nutzer selbst angelegt */
   own?: boolean;
+  /** aus einer berechneten Koordinate erzeugt – wird bei geänderten Variablen neu berechnet */
+  calc?: { defId: string; index: number };
 }
 
 export interface LatLonPair {
@@ -92,6 +95,10 @@ export interface UserData {
   ownWaypoints: Waypoint[];
   /** IDs der eigenen Listen, in denen der Cache liegt */
   lists?: string[];
+  /** Rätsel-Variablen: Name → Wert oder Formel */
+  variables?: Record<string, string>;
+  /** Berechnete Koordinaten (Formeln mit Variablen) */
+  calcCoords?: CalcCoordDef[];
 }
 
 /** Eigene Cache-Liste (wie "Listen" in c:geo) */

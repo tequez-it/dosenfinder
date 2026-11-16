@@ -88,7 +88,10 @@
       <groundspeak:difficulty>4</groundspeak:difficulty>
       <groundspeak:terrain>1.5</groundspeak:terrain>
       <groundspeak:short_description html="False">Löse das Rätsel zu Hause.</groundspeak:short_description>
-      <groundspeak:long_description html="False">Die Koordinaten oben sind nicht das Final.</groundspeak:long_description>
+      <groundspeak:long_description html="False">Die Koordinaten oben sind nicht das Final.
+Zwischenziel: N 50° 58.500 E 010° 00.900
+Final: N 50° 5A.B(C*2)7 E 010° 0C.ABC
+Lösung prüfen: https://www.geocheck.org/geo_inputchkcoord.php?gid=12345</groundspeak:long_description>
       <groundspeak:encoded_hints />
     </groundspeak:cache>
   </wpt>
