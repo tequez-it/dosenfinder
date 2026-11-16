@@ -379,3 +379,15 @@ export async function deleteCaches(codes: string[]): Promise<void> {
   }
   await tx.done;
 }
+
+/**
+ * Variablen und berechnete Koordinaten speichern. Die eigenen Wegpunkte werden
+ * aus dem gespeicherten Stand neu berechnet (nicht aus einer evtl. veralteten Kopie).
+ */
+export async function savePuzzleData(
+  code: string,
+  data: Pick<UserData, 'variables' | 'calcCoords'>,
+  updateWaypoints: (stored: Waypoint[]) => Waypoint[],
+): Promise<UserData> {
+  return updateUserData(code, (u) => ({ ...u, ...data, ownWaypoints: updateWaypoints(u.ownWaypoints) }));
+}

@@ -8,6 +8,7 @@ import { Navigate } from './screens/Navigate';
 import { LogScreen } from './screens/LogScreen';
 import { FieldNotesScreen } from './screens/FieldNotesScreen';
 import { ListsScreen } from './screens/ListsScreen';
+import { GotoScreen } from './screens/GotoScreen';
 import { Header } from './components/Header';
 import { hashFor, parseHash, type Route } from './routes';
 
@@ -96,6 +97,10 @@ export function App() {
           onImport={() => go({ name: 'import' })}
         />
       );
+    case 'goto':
+      return <GotoScreen onBack={() => back({ name: 'home' })} onGo={(lat, lon) => go({ name: 'point', lat, lon })} />;
+    case 'point':
+      return <Navigate key={`${route.lat}/${route.lon}`} point={{ lat: route.lat, lon: route.lon }} onBack={() => back({ name: 'goto' })} />;
     case 'lists':
       return <ListsScreen onBack={() => back({ name: 'list' })} />;
     case 'fieldnotes':
@@ -131,6 +136,7 @@ export function App() {
           onList={() => go({ name: 'list' })}
           onMap={() => go({ name: 'map' })}
           onFieldNotes={() => go({ name: 'fieldnotes' })}
+          onGoto={() => go({ name: 'goto' })}
           onImport={() => go({ name: 'import' })}
         />
       );

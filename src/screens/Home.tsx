@@ -5,11 +5,12 @@ interface Props {
   onList: () => void;
   onMap: () => void;
   onFieldNotes: () => void;
+  onGoto: () => void;
   onImport: () => void;
 }
 
 /** Startseite mit Kacheln, angelehnt an das c:geo-Hauptmenü. */
-export function Home({ onList, onMap, onFieldNotes, onImport }: Props) {
+export function Home({ onList, onMap, onFieldNotes, onGoto, onImport }: Props) {
   const [count, setCount] = useState<number | null>(null);
   const [notes, setNotes] = useState<number | null>(null);
 
@@ -50,6 +51,16 @@ export function Home({ onList, onMap, onFieldNotes, onImport }: Props) {
           </svg>
           <span class="tile-label">Field Notes</span>
           <span class="tile-sub">{notes === null ? '' : notes === 0 ? 'keine neuen' : `${notes} neu`}</span>
+        </button>
+        <button class="tile" onClick={onGoto}>
+          <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true">
+            <rect x="4" y="4" width="48" height="48" rx="10" fill="#c5262c" />
+            <circle cx="28" cy="28" r="13" fill="none" stroke="#fff" stroke-width="3" />
+            <path d="M28 10v8M28 38v8M10 28h8M38 28h8" stroke="#fff" stroke-width="3" stroke-linecap="round" />
+            <circle cx="28" cy="28" r="3.5" fill="#fff" />
+          </svg>
+          <span class="tile-label">Gehe zu</span>
+          <span class="tile-sub">Koordinate ansteuern</span>
         </button>
         <button class="tile" onClick={onImport}>
           <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true">

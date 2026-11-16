@@ -10,11 +10,14 @@ import { Header } from '../components/Header';
 import type { LatLon } from '../geo';
 
 interface Props {
-  code: string;
+  /** Cache-Code; leer bei freier Koordinate ("Gehe zu") */
+  code?: string;
   waypoint?: string;
+  /** freie Koordinate statt Cache */
+  point?: LatLon;
   onBack: () => void;
-  /** Karte mit Linie zum Ziel öffnen */
-  onShowMap: () => void;
+  /** Karte mit Linie zum Ziel öffnen (nur bei Caches) */
+  onShowMap?: () => void;
 }
 
 interface Target extends LatLon {
@@ -24,7 +27,7 @@ interface Target extends LatLon {
 
 type Loaded = Target | null | 'missing';
 
-export function Navigate({ code, waypoint, onBack, onShowMap }: Props) {
+export function Navigate({ code, waypoint, point, onBack, onShowMap }: Props) {
   const [target, setTarget] = useState<Loaded>(null);
   const position = usePosition();
   const { state: heading, requestPermission } = useHeading();
@@ -33,6 +36,10 @@ export function Navigate({ code, waypoint, onBack, onShowMap }: Props) {
 
   useEffect(() => {
     (async () => {
+      if (point) {
+        return setTarget({ ...point, title: 'Gehe zu', subtitle: formatCoords(point.lat, point.lon) });
+      }
+      if (!code) return setTarget('missing');
       const summary = await getSummary(code);
       if (!summary) return setTarget('missing');
       if (!waypoint) {
@@ -42,7 +49,7 @@ export function Navigate({ code, waypoint, onBack, onShowMap }: Props) {
       if (!wp || wp.lat === null || wp.lon === null) return setTarget('missing');
       setTarget({ lat: wp.lat, lon: wp.lon, title: wp.name, subtitle: `${wp.code} · ${summary.name}` });
     })().catch(() => setTarget('missing'));
-  }, [code, waypoint]);
+  }, [code, waypoint, point?.lat, point?.lon]);
 
   if (target === null) return <div class="screen"><Header title="Navigation" onBack={onBack} /></div>;
   if (target === 'missing') {
@@ -77,12 +84,14 @@ export function Navigate({ code, waypoint, onBack, onShowMap }: Props) {
         subtitle={target.subtitle}
         onBack={onBack}
         actions={
+          onShowMap && (
           <button class="icon-btn" onClick={onShowMap} aria-label="Karte mit Ziel zeigen">
             <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M4 6l5-2 6 2 5-2v14l-5 2-6-2-5 2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
               <path d="M9 4v14M15 6v14" stroke="currentColor" stroke-width="2" />
             </svg>
           </button>
+          )
         }
       />
 

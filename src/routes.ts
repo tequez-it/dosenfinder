@@ -5,6 +5,10 @@ export type Route =
   | { name: 'map'; code?: string; waypoint?: string }
   | { name: 'fieldnotes' }
   | { name: 'lists' }
+  /** "Gehe zu": beliebige Koordinate eingeben */
+  | { name: 'goto' }
+  /** Navigation zu einer freien Koordinate */
+  | { name: 'point'; lat: number; lon: number }
   | { name: 'log'; code: string }
   | { name: 'import' }
   | { name: 'cache'; code: string }
@@ -25,6 +29,13 @@ export function parseHash(hash: string): Route {
       return { name: 'fieldnotes' };
     case 'listen':
       return { name: 'lists' };
+    case 'gehezu':
+      return { name: 'goto' };
+    case 'punkt': {
+      const lat = Number(parts[1]);
+      const lon = Number(parts[2]);
+      return Number.isFinite(lat) && Number.isFinite(lon) && parts[1] && parts[2] ? { name: 'point', lat, lon } : { name: 'goto' };
+    }
     case 'log':
       return parts[1] ? { name: 'log', code: parts[1] } : { name: 'fieldnotes' };
     case 'import':
@@ -52,6 +63,10 @@ export function hashFor(r: Route): string {
       return '#/fieldnotes';
     case 'lists':
       return '#/listen';
+    case 'goto':
+      return '#/gehezu';
+    case 'point':
+      return `#/punkt/${r.lat.toFixed(6)}/${r.lon.toFixed(6)}`;
     case 'log':
       return `#/log/${encodeURIComponent(r.code)}`;
     case 'import':

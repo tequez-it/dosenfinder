@@ -38,7 +38,7 @@ export function FieldNotesScreen({ onBack }: Props) {
 
   const doExport = async () => {
     setMessage('');
-    const result = await shareOrDownload(encodeUtf16le(buildFieldNotesText(toExport)), FILE_NAME, 'text/plain', 'Field Notes');
+    const result = await shareOrDownload(encodeUtf16le(buildFieldNotesText(toExport)), FILE_NAME, 'text/plain');
     if (result === 'cancelled') return;
     await markFieldNotesExported(toExport.map((n) => n.code));
     setMessage(`${toExport.length} Field Note${toExport.length === 1 ? '' : 's'} exportiert.`);
